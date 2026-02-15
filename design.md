@@ -1,4 +1,4 @@
-# Requirements Specification: Sentinel AI
+# Design Document: Sentinel AI
 ## Autonomous Purple Teaming Platform
 
 **Project Name:** Sentinel AI  
@@ -8,214 +8,655 @@
 
 ---
 
-## 1. Introduction
+## 1. Executive Summary
 
-### 1.1 Purpose
-This document specifies the functional and non-functional requirements for Sentinel AI, an autonomous purple teaming platform that deploys dual-model AI agents to validate vulnerabilities through active exploitation and auto-remediation.
+Sentinel AI is an autonomous purple teaming platform that deploys dual-model AI agents (Red Team offensive + Blue Team defensive) to validate vulnerabilities through active exploitation and auto-remediation. Built on AWS serverless architecture, it eliminates the reactive nature of traditional cybersecurity tools by continuously learning and adapting to new threats.
 
-### 1.2 Scope
-Sentinel AI addresses the reactive nature of traditional cybersecurity by implementing offensive (Red Team) and defensive (Blue Team) AI agents that operate in real-time on AWS serverless infrastructure.
-
-### 1.3 Problem Statement
-Traditional cybersecurity is reactive, manual, and generates high false positives. Standard AWS native tools (like GuardDuty) are passive observers that alert but do not validate or auto-remediate complex vulnerabilities.
-
-### 1.4 Solution
-An Autonomous Purple Teaming Platform with dual-model AI agents battling in real-time. The Offensive Agent actively (and safely) exploits vulnerabilities to validate risk, while the Defensive Agent auto-patches the infrastructure and learns from the attack.
+### 1.1 Key Differentiators
+- **Active Validation:** Unlike GuardDuty's passive monitoring, Sentinel AI actively exploits vulnerabilities to validate real risk.
+- **Auto-Remediation:** Blue Agent automatically patches infrastructure without human intervention.
+- **Continuous Learning:** RAG-powered knowledge base evolves with each attack-defense cycle.
+- **Zero-Ops:** Fully serverless architecture with scale-to-zero capabilities.
+- **Cost-Effective:** Sub-$40 per customer monthly operating cost.
 
 ---
 
-## 2. Functional Requirements (EARS Notation)
+## 2. System Architecture
 
-### 2.1 Purple Teaming Loop
+### 2.1 High-Level Architecture
 
-#### FR-001: Campaign Initiation (Event-Driven)
-**WHEN** an administrator initiates a validation campaign from the Amplify UI, **THE SYSTEM SHALL** deploy the Red Agent with isolated IAM credentials and initialize a new attack session in DynamoDB.
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        UI[Vue.js Dashboard<br/>AWS Amplify]
+    end
+    
+    subgraph "Compute Layer"
+        AR[AWS App Runner<br/>Python LangChain Agents]
+        RED[Red Agent<br/>Offensive AI]
+        BLUE[Blue Agent<br/>Defensive AI]
+    end
+    
+    subgraph "AI Intelligence Layer"
+        BEDROCK[Amazon Bedrock<br/>Claude 3.5 Sonnet]
+        KB[Knowledge Bases<br/>RAG Memory]
+    end
+    
+    subgraph "Data Layer"
+        DDB[(DynamoDB<br/>Session State)]
+        S3[(S3<br/>Reports & Artifacts)]
+    end
+    
+    subgraph "Security & Monitoring"
+        WAF[AWS WAF]
+        CW[CloudWatch]
+        IAM[IAM Roles]
+    end
+    
+    UI -->|Initiates Campaign| AR
+    AR -->|Hosts| RED
+    AR -->|Hosts| BLUE
+    RED -->|Queries| BEDROCK
+    BLUE -->|Queries| BEDROCK
+    RED -->|Retrieves Patterns| KB
+    BLUE -->|Retrieves Playbooks| KB
+    RED -->|Logs Actions| DDB
+    BLUE -->|Logs Actions| DDB
+    RED -->|Executes Attack| WAF
+    WAF -->|Detects Anomaly| CW
+    CW -->|Triggers| BLUE
+    BLUE -->|Updates Rules| WAF
+    BLUE -->|Stores Reports| S3
+    IAM -->|Governs| RED
+    IAM -->|Governs| BLUE
+    KB -->|Updates Knowledge| DDB
+```
 
-#### FR-002: Attack Vector Planning (Ubiquitous)
-**THE SYSTEM SHALL** utilize Amazon Bedrock (Claude 3.5 Sonnet) to analyze the target infrastructure and formulate attack payloads including SQL injection, XSS, privilege escalation, and API abuse vectors.
+### 2.2 Component Architecture
 
-#### FR-003: Offensive Execution (Event-Driven)
-**WHEN** the Red Agent formulates an attack payload, **THE SYSTEM SHALL** execute the attack using LangChain @tool function calling against the target AWS infrastructure while logging all actions to DynamoDB.
-
-#### FR-004: Anomaly Detection (Event-Driven)
-**WHEN** AWS WAF or CloudWatch detects an anomaly from the Red Agent attack, **THE SYSTEM SHALL** trigger the Blue Agent within 5 seconds with full context of the detected threat.
-
-#### FR-005: RAG Knowledge Query (Event-Driven)
-**WHEN** the Blue Agent is triggered, **THE SYSTEM SHALL** query the Knowledge Bases for Amazon Bedrock to retrieve relevant mitigation strategies from past attack patterns and CVE databases.
-
-#### FR-006: Auto-Remediation (Event-Driven)
-**WHEN** the Blue Agent identifies a mitigation strategy, **THE SYSTEM SHALL** automatically apply patches including WAF ACL rule updates, security group modifications, or IAM policy restrictions via AWS SDK.
-
-#### FR-007: Session State Persistence (Ubiquitous)
-**THE SYSTEM SHALL** log all attack outcomes, defense actions, and timestamps to DynamoDB with session correlation IDs for audit trail purposes.
-
-#### FR-008: Knowledge Base Evolution (Event-Driven)
-**WHEN** an attack is successfully mitigated, **THE SYSTEM SHALL** update the RAG Knowledge Base with the attack vector signature and successful remediation playbook to prevent future occurrences.
-
-### 2.2 Automated Compliance
-
-#### FR-009: Compliance Report Generation (Event-Driven)
-**WHEN** a validation campaign completes, **THE SYSTEM SHALL** auto-generate SOC 2 and ISO 27001 audit reports based on simulated attacks and successful auto-remediations.
-
-#### FR-010: Report Storage (Ubiquitous)
-**THE SYSTEM SHALL** store all generated compliance reports in Amazon S3 with encryption at rest and versioning enabled.
-
-#### FR-011: Compliance Dashboard (State-Driven)
-**WHILE** a validation campaign is active, **THE SYSTEM SHALL** display real-time compliance metrics on the Vue.js dashboard including attack success rate, remediation time, and coverage percentage.
-
-### 2.3 Agent Intelligence
-
-#### FR-012: Tool Function Calling (Ubiquitous)
-**THE SYSTEM SHALL** enable LangChain agents to execute local scripts including Nmap scans, AWS SDK operations, and vulnerability scanners through Bedrock's native @tool function calling.
-
-#### FR-013: Attack Payload Validation (Unwanted Behavior)
-**IF** the Red Agent generates an attack payload that targets production customer data, **THEN THE SYSTEM SHALL** reject the payload and log a security violation to DynamoDB.
-
-#### FR-014: Defense Strategy Selection (Event-Driven)
-**WHEN** multiple mitigation strategies are available, **THE SYSTEM SHALL** select the strategy with the highest success rate from historical RAG data and lowest infrastructure impact.
-
-### 2.4 User Interface
-
-#### FR-015: Campaign Dashboard (Ubiquitous)
-**THE SYSTEM SHALL** provide a Vue.js dashboard hosted on AWS Amplify displaying active campaigns, agent status, attack vectors, and defense actions in real-time.
-
-#### FR-016: Manual Override (Optional Feature)
-**WHERE** an administrator requires manual intervention, **THE SYSTEM SHALL** provide controls to pause agents, approve high-risk remediations, or terminate campaigns.
-
-#### FR-017: Historical Analysis (State-Driven)
-**WHILE** viewing past campaigns, **THE SYSTEM SHALL** display attack timelines, defense response times, and knowledge base evolution metrics with filterable date ranges.
-
-### 2.5 Cost Optimization
-
-#### FR-018: Auto-Scaling (State-Driven)
-**WHILE** no validation campaigns are active, **THE SYSTEM SHALL** scale AWS App Runner instances to zero to minimize compute costs.
-
-#### FR-019: Bedrock Token Management (Ubiquitous)
-**THE SYSTEM SHALL** implement token usage tracking and caching strategies to maintain Amazon Bedrock costs under $50 per month for 5 enterprise customers.
-
----
-
-## 3. Non-Functional Requirements
-
-### 3.1 Security
-
-#### NFR-001: IAM Role Separation (Ubiquitous)
-**THE SYSTEM SHALL** strictly separate IAM roles for Offensive and Defensive agents with the Red Agent having read-only access to production and the Blue Agent having write access to security controls only.
-
-#### NFR-002: Encryption (Ubiquitous)
-**THE SYSTEM SHALL** encrypt all data at rest in DynamoDB and S3 using AWS KMS and all data in transit using TLS 1.3.
-
-#### NFR-003: Audit Logging (Ubiquitous)
-**THE SYSTEM SHALL** maintain immutable audit logs in DynamoDB with CloudWatch Logs integration for all agent actions and administrative operations.
-
-### 3.2 Performance
-
-#### NFR-004: Response Time (Ubiquitous)
-**THE SYSTEM SHALL** trigger the Blue Agent within 5 seconds of anomaly detection by AWS WAF or CloudWatch.
-
-#### NFR-005: Remediation Time (Ubiquitous)
-**THE SYSTEM SHALL** complete auto-remediation actions within 30 seconds of Blue Agent strategy selection.
-
-#### NFR-006: RAG Query Latency (Ubiquitous)
-**THE SYSTEM SHALL** return relevant mitigation strategies from Knowledge Bases for Amazon Bedrock within 2 seconds.
-
-### 3.3 Scalability
-
-#### NFR-007: Concurrent Campaigns (Ubiquitous)
-**THE SYSTEM SHALL** support up to 10 concurrent validation campaigns per enterprise customer without performance degradation.
-
-#### NFR-008: Knowledge Base Growth (Ubiquitous)
-**THE SYSTEM SHALL** scale the RAG Knowledge Base to store at least 10,000 attack patterns and mitigation playbooks without query performance impact.
-
-### 3.4 Cost Constraints
-
-#### NFR-009: Unit Economics (Ubiquitous)
-**THE SYSTEM SHALL** operate under $200 per month total infrastructure cost for 5 enterprise customers ($40 per customer).
-
-#### NFR-010: MVP Cost Target (Ubiquitous)
-**THE SYSTEM SHALL** maintain a sub-$25 monthly cost during MVP phase by leveraging AWS Free Tier and scale-to-zero capabilities.
-
-### 3.5 Availability
-
-#### NFR-011: Uptime (Ubiquitous)
-**THE SYSTEM SHALL** maintain 99.5% uptime for the Amplify dashboard and App Runner services during business hours (9 AM - 6 PM EST).
-
-#### NFR-012: Disaster Recovery (Unwanted Behavior)
-**IF** a critical AWS service failure occurs, **THEN THE SYSTEM SHALL** gracefully degrade by pausing active campaigns and preserving session state in DynamoDB.
-
-### 3.6 Compliance
-
-#### NFR-013: SOC 2 Type II Alignment (Ubiquitous)
-**THE SYSTEM SHALL** implement controls aligned with SOC 2 Type II requirements including access controls, encryption, and audit logging.
-
-#### NFR-014: ISO 27001 Alignment (Ubiquitous)
-**THE SYSTEM SHALL** implement security controls aligned with ISO 27001 standards for information security management.
+```mermaid
+graph LR
+    subgraph "AWS App Runner Container"
+        LC[LangChain Framework]
+        RA[Red Agent Module]
+        BA[Blue Agent Module]
+        TOOLS[Tool Functions]
+    end
+    
+    subgraph "Bedrock Integration"
+        CLAUDE[Claude 3.5 Sonnet]
+        FUNC[Tool Function Calling]
+    end
+    
+    LC --> RA
+    LC --> BA
+    RA --> FUNC
+    BA --> FUNC
+    FUNC --> CLAUDE
+    FUNC --> TOOLS
+    TOOLS -->|Nmap, AWS SDK| EXEC[Execution Layer]
+```
 
 ---
 
-## 4. Constraints
+## 3. Detailed Component Design
 
-### 4.1 Technical Constraints
-- **TC-001:** The system MUST use serverless-first architecture (NO Kubernetes/EKS).
-- **TC-002:** The system MUST use AWS App Runner for compute hosting.
-- **TC-003:** The system MUST use Amazon Bedrock with Claude 3.5 Sonnet model.
-- **TC-004:** The system MUST use Python LangChain for agent framework.
-- **TC-005:** The system MUST use Knowledge Bases for Amazon Bedrock for RAG implementation.
+### 3.1 Frontend Layer
 
-### 4.2 Business Constraints
-- **BC-001:** The MVP must be deployable within Hackathon timeframe (48-72 hours).
-- **BC-002:** The system must demonstrate clear ROI through automated compliance report generation.
-- **BC-003:** The system must differentiate from passive monitoring tools (GuardDuty, Security Hub).
+#### 3.1.1 Vue.js Dashboard (AWS Amplify)
+**Purpose:** Provide real-time visualization of purple teaming campaigns.
 
-### 4.3 Operational Constraints
-- **OC-001:** The system must require zero manual infrastructure management (zero-ops).
-- **OC-002:** The system must scale to zero when idle to minimize costs.
-- **OC-003:** The system must support deployment in a single AWS region initially.
+**Key Features:**
+- Campaign initiation interface
+- Real-time agent status monitoring
+- Attack vector visualization
+- Defense action timeline
+- Compliance report viewer
+- Historical campaign analytics
+
+**Technology Stack:**
+- Vue.js 3 with Composition API
+- AWS Amplify Hosting
+- AWS Amplify Auth (Cognito integration)
+- WebSocket for real-time updates
+
+**Deployment:**
+- Hosted on AWS Amplify with CI/CD from Git repository
+- CloudFront CDN for global distribution
+- Custom domain with SSL/TLS
+
+### 3.2 Compute Layer
+
+#### 3.2.1 AWS App Runner
+**Purpose:** Host Python-based LangChain AI agents in Docker containers.
+
+**Configuration:**
+- **Runtime:** Python 3.11
+- **Memory:** 2 GB
+- **CPU:** 1 vCPU
+- **Auto-scaling:** 1-10 instances based on concurrent campaigns
+- **Scale-to-zero:** Enabled (scales to 0 after 5 minutes of inactivity)
+
+**Docker Container:**
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "main.py"]
+```
+
+**Dependencies:**
+- langchain
+- boto3 (AWS SDK)
+- langchain-aws (Bedrock integration)
+- fastapi (API endpoints)
+- uvicorn (ASGI server)
+
+#### 3.2.2 Red Agent (Offensive AI)
+**Purpose:** Formulate and execute attack payloads to validate vulnerabilities.
+
+**Capabilities:**
+- SQL injection payload generation
+- XSS attack simulation
+- Privilege escalation testing
+- API abuse detection
+- Network scanning (Nmap integration)
+
+**LangChain Tools:**
+```python
+@tool
+def execute_sql_injection(target_url: str, payload: str) -> dict:
+    """Execute SQL injection attack against target URL"""
+    # Implementation with safety checks
+    pass
+
+@tool
+def scan_network(target_ip: str) -> dict:
+    """Perform Nmap scan on target infrastructure"""
+    # Implementation
+    pass
+
+@tool
+def test_privilege_escalation(iam_role: str) -> dict:
+    """Test IAM privilege escalation vectors"""
+    # Implementation
+    pass
+```
+
+**IAM Permissions:**
+- Read-only access to target infrastructure
+- Write access to DynamoDB (logging only)
+- No production data access
+
+#### 3.2.3 Blue Agent (Defensive AI)
+**Purpose:** Detect attacks and auto-remediate vulnerabilities.
+
+**Capabilities:**
+- Anomaly detection via CloudWatch integration
+- RAG-powered mitigation strategy retrieval
+- Automated WAF rule updates
+- Security group modification
+- IAM policy restriction
+
+**LangChain Tools:**
+```python
+@tool
+def update_waf_acl(rule_id: str, action: str) -> dict:
+    """Update AWS WAF ACL rules to block attack vectors"""
+    # Implementation using boto3
+    pass
+
+@tool
+def modify_security_group(group_id: str, rule: dict) -> dict:
+    """Modify security group rules to restrict access"""
+    # Implementation
+    pass
+
+@tool
+def query_knowledge_base(attack_vector: str) -> dict:
+    """Query RAG knowledge base for mitigation strategies"""
+    # Implementation using Bedrock Knowledge Bases API
+    pass
+```
+
+**IAM Permissions:**
+- Write access to WAF, Security Groups, IAM policies
+- Read access to CloudWatch, GuardDuty
+- Write access to DynamoDB and S3
+
+### 3.3 AI Intelligence Layer
+
+#### 3.3.1 Amazon Bedrock (Claude 3.5 Sonnet)
+**Purpose:** Provide reasoning engine for both Red and Blue agents.
+
+**Model Configuration:**
+- **Model ID:** anthropic.claude-3-5-sonnet-20241022-v2:0
+- **Temperature:** 0.7 (balanced creativity and consistency)
+- **Max Tokens:** 4096
+- **Top P:** 0.9
+
+**Usage Patterns:**
+- Red Agent: Attack vector planning and payload generation
+- Blue Agent: Threat analysis and mitigation strategy selection
+
+**Cost Optimization:**
+- Response caching for repeated queries
+- Token usage tracking per campaign
+- Batch processing for non-urgent operations
+
+#### 3.3.2 Knowledge Bases for Amazon Bedrock (RAG)
+**Purpose:** Store and retrieve attack patterns, CVEs, and mitigation playbooks.
+
+**Data Sources:**
+- CVE database (NIST NVD)
+- MITRE ATT&CK framework
+- Historical attack logs from DynamoDB
+- Successful remediation playbooks
+
+**Vector Store:**
+- Amazon OpenSearch Serverless
+- Embedding model: amazon.titan-embed-text-v1
+- Chunk size: 512 tokens
+- Overlap: 50 tokens
+
+**Knowledge Base Structure:**
+```json
+{
+  "attack_vector": "SQL Injection",
+  "cve_id": "CVE-2024-XXXX",
+  "severity": "HIGH",
+  "mitigation_strategy": {
+    "action": "update_waf_acl",
+    "parameters": {
+      "rule_type": "SQLi_RULE",
+      "action": "BLOCK"
+    }
+  },
+  "success_rate": 0.95,
+  "last_updated": "2026-02-15T10:30:00Z"
+}
+```
+
+### 3.4 Data Layer
+
+#### 3.4.1 Amazon DynamoDB
+**Purpose:** Store session states, audit logs, and attack outcomes.
+
+**Table Design:**
+
+**Table 1: CampaignSessions**
+```
+Partition Key: campaign_id (String)
+Sort Key: timestamp (Number)
+Attributes:
+  - status (String): ACTIVE | COMPLETED | FAILED
+  - red_agent_actions (List)
+  - blue_agent_actions (List)
+  - attack_vectors (List)
+  - remediation_count (Number)
+  - cost_usd (Number)
+```
+
+**Table 2: AuditLogs**
+```
+Partition Key: session_id (String)
+Sort Key: event_timestamp (Number)
+Attributes:
+  - agent_type (String): RED | BLUE
+  - action (String)
+  - target (String)
+  - outcome (String)
+  - iam_role (String)
+```
+
+**Table 3: KnowledgeEvolution**
+```
+Partition Key: attack_vector_id (String)
+Sort Key: version (Number)
+Attributes:
+  - attack_signature (String)
+  - mitigation_playbook (Map)
+  - success_rate (Number)
+  - last_seen (Number)
+```
+
+**Capacity Mode:** On-Demand (pay-per-request)
+**Encryption:** AWS KMS with customer-managed key
+**Backup:** Point-in-time recovery enabled
+
+#### 3.4.2 Amazon S3
+**Purpose:** Store compliance reports and attack artifacts.
+
+**Bucket Structure:**
+```
+sentinel-ai-artifacts/
+├── compliance-reports/
+│   ├── soc2/
+│   │   └── campaign-{id}-soc2-{date}.pdf
+│   └── iso27001/
+│       └── campaign-{id}-iso27001-{date}.pdf
+├── attack-artifacts/
+│   └── campaign-{id}/
+│       ├── payloads.json
+│       └── network-scans.txt
+└── knowledge-base-exports/
+    └── kb-snapshot-{date}.json
+```
+
+**Configuration:**
+- Versioning: Enabled
+- Encryption: SSE-S3
+- Lifecycle Policy: Move to Glacier after 90 days
+- Public Access: Blocked
+
+### 3.5 Security & Monitoring Layer
+
+#### 3.5.1 AWS WAF
+**Purpose:** Detect and block attack vectors from Red Agent.
+
+**Rule Groups:**
+- AWS Managed Rules (Core Rule Set)
+- SQL Injection protection
+- XSS protection
+- Rate limiting (100 requests per 5 minutes)
+
+**Integration:**
+- CloudWatch Logs for anomaly detection
+- Blue Agent API for rule updates
+
+#### 3.5.2 Amazon CloudWatch
+**Purpose:** Monitor agent actions and trigger Blue Agent on anomalies.
+
+**Metrics:**
+- Red Agent attack success rate
+- Blue Agent response time
+- WAF block count
+- Bedrock token usage
+- App Runner CPU/Memory utilization
+
+**Alarms:**
+- Blue Agent response time > 30 seconds
+- Bedrock cost > $10/day
+- DynamoDB throttling events
+
+**Log Groups:**
+- /aws/apprunner/sentinel-ai
+- /aws/waf/sentinel-ai
+- /aws/lambda/blue-agent-trigger
+
+#### 3.5.3 IAM Role Separation
+**Red Agent Role:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:Describe*",
+        "waf:Get*",
+        "dynamodb:PutItem"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": [
+        "waf:UpdateWebACL",
+        "ec2:Modify*",
+        "iam:*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Blue Agent Role:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "waf:UpdateWebACL",
+        "ec2:ModifySecurityGroupRules",
+        "iam:UpdateAssumeRolePolicy",
+        "dynamodb:PutItem",
+        "s3:PutObject"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
 
 ---
 
-## 5. Assumptions and Dependencies
+## 4. Data Flow Diagrams
 
-### 5.1 Assumptions
-- **A-001:** Administrators have AWS accounts with sufficient permissions to deploy App Runner, Bedrock, and DynamoDB.
-- **A-002:** Target infrastructure for validation campaigns is non-production or isolated sandbox environments.
-- **A-003:** Amazon Bedrock Claude 3.5 Sonnet is available in the deployment region.
+### 4.1 Purple Teaming Loop Flow
 
-### 5.2 Dependencies
-- **D-001:** AWS App Runner service availability.
-- **D-002:** Amazon Bedrock API access with Claude 3.5 Sonnet model.
-- **D-003:** Knowledge Bases for Amazon Bedrock service availability.
-- **D-004:** Python 3.11+ runtime environment.
-- **D-005:** LangChain library compatibility with Bedrock.
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant UI as Vue.js Dashboard
+    participant AppRunner as App Runner
+    participant RedAgent as Red Agent
+    participant Bedrock as Amazon Bedrock
+    participant KB as Knowledge Base
+    participant WAF as AWS WAF
+    participant CW as CloudWatch
+    participant BlueAgent as Blue Agent
+    participant DDB as DynamoDB
+    participant S3 as S3
+
+    Admin->>UI: Initiate Campaign
+    UI->>AppRunner: POST /campaigns/start
+    AppRunner->>RedAgent: Initialize with IAM Role
+    RedAgent->>Bedrock: Request attack vector planning
+    Bedrock->>KB: Query past attack patterns
+    KB-->>Bedrock: Return relevant CVEs
+    Bedrock-->>RedAgent: Generate SQL injection payload
+    RedAgent->>DDB: Log attack initiation
+    RedAgent->>WAF: Execute attack payload
+    WAF->>CW: Log anomaly detected
+    CW->>BlueAgent: Trigger defense (EventBridge)
+    BlueAgent->>Bedrock: Analyze threat
+    Bedrock->>KB: Query mitigation strategies
+    KB-->>Bedrock: Return remediation playbook
+    Bedrock-->>BlueAgent: Recommend WAF rule update
+    BlueAgent->>WAF: Update ACL to block attack
+    BlueAgent->>DDB: Log remediation action
+    BlueAgent->>KB: Update knowledge base
+    BlueAgent->>S3: Generate compliance report
+    BlueAgent->>UI: Send real-time update
+    UI-->>Admin: Display defense success
+```
+
+### 4.2 Knowledge Base Evolution Flow
+
+```mermaid
+flowchart TD
+    A[Attack Executed] --> B{Attack Successful?}
+    B -->|Yes| C[Blue Agent Triggered]
+    B -->|No| D[Log Failed Attack]
+    C --> E[Query RAG Knowledge Base]
+    E --> F{Strategy Found?}
+    F -->|Yes| G[Apply Existing Playbook]
+    F -->|No| H[Bedrock Generates New Strategy]
+    G --> I[Execute Remediation]
+    H --> I
+    I --> J{Remediation Successful?}
+    J -->|Yes| K[Update Knowledge Base]
+    J -->|No| L[Log Failure & Retry]
+    K --> M[Increment Success Rate]
+    M --> N[RAG Permanently Learns]
+    D --> O[End]
+    L --> O
+    N --> O
+```
 
 ---
 
-## 6. Acceptance Criteria
+## 5. Technology Stack Summary
 
-### 6.1 MVP Success Criteria
-1. Red Agent successfully executes at least 3 different attack vectors (SQL injection, XSS, privilege escalation).
-2. Blue Agent detects and auto-remediates all 3 attacks within 30 seconds.
-3. RAG Knowledge Base demonstrates learning by blocking repeat attacks automatically.
-4. Compliance report is generated and stored in S3 after campaign completion.
-5. Total infrastructure cost remains under $25 for MVP deployment.
-
-### 6.2 Hackathon Demo Criteria
-1. Live demonstration of Purple Teaming Loop from campaign initiation to auto-remediation.
-2. Real-time dashboard showing agent battle and defense actions.
-3. Generated SOC 2 compliance report displayed to judges.
-4. Cost breakdown showing unit economics under $40 per customer.
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| Frontend | Vue.js 3 | Dashboard UI |
+| Hosting | AWS Amplify | Frontend hosting & CI/CD |
+| Compute | AWS App Runner | Container hosting |
+| AI Engine | Amazon Bedrock (Claude 3.5 Sonnet) | Agent reasoning |
+| Agent Framework | Python LangChain | Tool orchestration |
+| Vector Memory | Knowledge Bases for Amazon Bedrock | RAG implementation |
+| Database | Amazon DynamoDB | Session state & logs |
+| Storage | Amazon S3 | Reports & artifacts |
+| Security | AWS WAF | Attack detection |
+| Monitoring | Amazon CloudWatch | Metrics & alarms |
+| Identity | AWS IAM | Role separation |
+| Embedding | Amazon Titan Embed | Vector generation |
+| Search | OpenSearch Serverless | Vector store |
 
 ---
 
-## 7. Glossary
+## 6. Deployment Architecture
 
-- **Purple Teaming:** Combined offensive (Red Team) and defensive (Blue Team) security testing.
-- **EARS Notation:** Easy Approach to Requirements Syntax for structured requirement writing.
-- **RAG:** Retrieval-Augmented Generation for AI knowledge retrieval.
-- **CVE:** Common Vulnerabilities and Exposures database.
-- **WAF:** Web Application Firewall.
-- **IAM:** Identity and Access Management.
-- **ACL:** Access Control List.
+### 6.1 Infrastructure as Code (IaC)
+
+**Tool:** AWS CDK (Python)
+
+**Stack Structure:**
+```
+sentinel-ai-cdk/
+├── app.py
+├── stacks/
+│   ├── frontend_stack.py (Amplify)
+│   ├── compute_stack.py (App Runner)
+│   ├── ai_stack.py (Bedrock, Knowledge Bases)
+│   ├── data_stack.py (DynamoDB, S3)
+│   └── security_stack.py (WAF, IAM)
+└── requirements.txt
+```
+
+### 6.2 Deployment Pipeline
+
+```mermaid
+flowchart LR
+    A[Git Push] --> B[AWS CodePipeline]
+    B --> C[CodeBuild: Run Tests]
+    C --> D[CDK Deploy: Infrastructure]
+    D --> E[App Runner: Deploy Container]
+    E --> F[Amplify: Deploy Frontend]
+    F --> G[CloudWatch: Monitor]
+```
+
+### 6.3 Environment Strategy
+
+**Environments:**
+1. **Dev:** Single App Runner instance, minimal Bedrock usage
+2. **Staging:** Production-like setup with synthetic campaigns
+3. **Production:** Auto-scaling enabled, full monitoring
+
+---
+
+## 7. Cost Analysis
+
+### 7.1 Cost Breakdown (5 Enterprise Customers)
+
+| Service | Usage | Monthly Cost |
+|---------|-------|--------------|
+| AWS App Runner | 100 hours active (scale-to-zero) | $25 |
+| Amazon Bedrock | 500K tokens/month | $50 |
+| Knowledge Bases | 10K vectors, 1K queries | $15 |
+| DynamoDB | 1M read/write units | $10 |
+| S3 | 10 GB storage, 1K requests | $5 |
+| CloudWatch | 10 GB logs, 50 metrics | $10 |
+| AWS WAF | 1M requests | $20 |
+| Amplify | 5 GB bandwidth | $5 |
+| **Total** | | **$140** |
+| **Per Customer** | | **$28** |
+
+### 7.2 MVP Cost (Single Customer)
+
+| Service | Usage | Monthly Cost |
+|---------|-------|--------------|
+| AWS App Runner | 20 hours (Free Tier) | $0 |
+| Amazon Bedrock | 100K tokens | $10 |
+| Knowledge Bases | 1K vectors | $3 |
+| DynamoDB | 100K units (Free Tier) | $0 |
+| S3 | 1 GB (Free Tier) | $0 |
+| CloudWatch | 5 GB logs (Free Tier) | $0 |
+| AWS WAF | 100K requests | $5 |
+| Amplify | 1 GB (Free Tier) | $0 |
+| **Total** | | **$18** |
+
+---
+
+## 8. Security Architecture
+
+### 8.1 Defense in Depth
+
+```mermaid
+graph TD
+    A[External Access] --> B[CloudFront + WAF]
+    B --> C[Amplify Frontend]
+    B --> D[App Runner API]
+    D --> E[IAM Role Validation]
+    E --> F[Agent Execution]
+    F --> G[KMS Encryption]
+    G --> H[DynamoDB/S3]
+    
+    I[Red Agent] -.->|Read-Only| J[Target Infrastructure]
+    K[Blue Agent] -.->|Write-Only| L[Security Controls]
+```
+
+### 8.2 Threat Model
+
+| Threat | Mitigation |
+|--------|-----------|
+| Red Agent privilege escalation | Strict IAM deny policies, no production access |
+| Blue Agent over-remediation | Human approval for high-risk changes (optional) |
+| Knowledge Base poisoning | Immutable audit logs, version control |
+| Bedrock prompt injection | Input validation, sanitization |
+| Cost explosion | CloudWatch billing alarms, token limits |
+
+---
+
+## 9. Compliance Mapping
+
+### 9.1 SOC 2 Type II Controls
+
+| Control | Implementation |
+|---------|---------------|
+| CC6.1 (Logical Access) | IAM role separation, MFA for admins |
+| CC6.6 (Encryption) | KMS for data at rest, TLS for transit |
+| CC7.2 (Monitoring) | CloudWatch logs, DynamoDB audit trail |
+
+### 9.2 ISO 27001 Controls
+
+| Control | Implementation |
+|---------|---------------|
+| A.9.2 (User Access) | Cognito authentication, IAM policies |
+| A.12.4 (Logging) | Immutable DynamoDB logs, CloudWatch |
+| A.18.1 (Compliance) | Auto-generated audit reports |
+
+---
+
+## 10. Future Enhancements
+
+### 10.1 Phase 2 Features
+- Multi-region deployment for global customers
+- Integration with third-party SIEM tools
+- Custom attack vector plugins
+- Advanced ML-based anomaly detection
+
+### 10.2 Scalability Roadmap
+- Support for 100+ concurrent campaigns
+- Multi-cloud support (Azure, GCP)
+- Enterprise SSO integration (SAML, OIDC)
 
 ---
 
