@@ -6,6 +6,7 @@ import json
 import asyncio
 from jose import jwt
 import os
+from src.config import Config
 
 router = APIRouter()
 
@@ -71,7 +72,7 @@ async def get_notifications(request: Request, limit: int = 50, unread_only: bool
     # import jwt (removed)
     # import os (removed)
     try:
-        payload = jwt.decode(token, os.environ.get("JWT_SECRET", "Sentinel AI-super-secret-jwt-key-2025"), algorithms=["HS256"])
+        payload = jwt.decode(token, Config.JWT_SECRET, algorithms=["HS256"])
         user_id = payload.get("userId")
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -159,7 +160,7 @@ async def mark_all_as_read(request: Request):
     # import jwt (removed)
     # import os (removed)
     try:
-        payload = jwt.decode(token, os.environ.get("JWT_SECRET", "Sentinel AI-super-secret-jwt-key-2025"), algorithms=["HS256"])
+        payload = jwt.decode(token, Config.JWT_SECRET, algorithms=["HS256"])
         user_id = payload.get("userId")
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -197,7 +198,7 @@ async def clear_all_notifications(request: Request):
     # import jwt (removed)
     # import os (removed)
     try:
-        payload = jwt.decode(token, os.environ.get("JWT_SECRET", "Sentinel AI-super-secret-jwt-key-2025"), algorithms=["HS256"])
+        payload = jwt.decode(token, Config.JWT_SECRET, algorithms=["HS256"])
         user_id = payload.get("userId")
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
