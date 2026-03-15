@@ -3,32 +3,22 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
+dist/
+build/
+eggs/
 *.egg
+.eggs/
 
 # Virtual Environment
 venv/
+.venv/
 env/
-ENV/
-.venv
 
-# Environment Variables
+# Environment
 .env
 .env.local
+.env.production
 
 # IDE
 .vscode/
@@ -37,21 +27,40 @@ ENV/
 *.swo
 *~
 
-# AWS
-.aws/
-
-# Logs
-*.log
-logs/
-
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Logs
+logs/
+*.log
+
+# Node modules (frontend/admin)
+node_modules/
+frontend/node_modules/
+admin/node_modules/
+
+# Frontend builds
+frontend/dist/
+admin/dist/
+
+# Docker
+docker-compose.override.yml
+
+# Database
+chroma_db/
+*.db
+
+# Uploads
+uploads/
+src/uploads/
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
 
-# Kiro
-.kiro/cache/
+# Distribution
+*.tar.gz
+*.whl

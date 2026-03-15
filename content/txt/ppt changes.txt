@@ -1,0 +1,28 @@
+1st slide:- change main name and date
+
+2nd slide:- no change
+
+3rd slide:- text layout sarkhu kari nakh j
+
+4th slide:- text layout sarkhu kari nakh j ane description me sarkhi rite nathi laikhu khali 
+tane idea aavi jai evi rite laikhu che to change kari nakh j 
+
+5th slide:- heading badhai proper che khali description change kari nakh j
+
+6th slide:- heading proper che description change karvana che
+
+7th slide:- heading ane description change karvana che
+
+8th slide:- delete
+
+9th slide:- Infrastructure Strategy, same layout, change content 
+
+10th slide:- Legal and Compliance Strategy, same layout, change content 
+
+11th slide:- Funding Strategy, same layout, change content 
+
+12th slide:- Conclusion tari rite kari nakh j
+
+13th slide:- delete
+
+14th slide:- resource che future changes mate rakh j 

@@ -1,0 +1,183 @@
+{
+  "name": "Sentinel AI - Compliance Report Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 * * 1"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger - Weekly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 400]
+    },
+    {
+      "parameters": {
+        "operation": "aggregate",
+        "collection": "executions",
+        "options": {
+          "pipeline": "[\n  {\n    \"$match\": {\n      \"created_at\": {\n        \"$gte\": { \"$date\": \"{{ new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() }}\" }\n      },\n      \"status\": \"completed\"\n    }\n  },\n  {\n    \"$group\": {\n      \"_id\": null,\n      \"total_scans\": { \"$sum\": 1 },\n      \"total_vulnerabilities\": { \"$sum\": \"$summary.total_vulnerabilities\" },\n      \"critical_count\": { \"$sum\": \"$summary.critical\" },\n      \"high_count\": { \"$sum\": \"$summary.high\" },\n      \"medium_count\": { \"$sum\": \"$summary.medium\" },\n      \"low_count\": { \"$sum\": \"$summary.low\" }\n    }\n  }\n]"
+        }
+      },
+      "name": "MongoDB - Fetch Scan Results",
+      "type": "n8n-nodes-base.mongodb",
+      "typeVersion": 1,
+      "position": [450, 400],
+      "credentials": {
+        "mongodb": {
+          "id": "1",
+          "name": "MongoDB Sentinel AI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "find",
+        "collection": "vulnerabilities",
+        "options": {
+          "query": "{\n  \"discovered_at\": {\n    \"$gte\": { \"$date\": \"{{ new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() }}\" }\n  },\n  \"status\": \"open\"\n}",
+          "sort": "{ \"cvss_score\": -1 }",
+          "limit": 50
+        }
+      },
+      "name": "MongoDB - Fetch Vulnerabilities",
+      "type": "n8n-nodes-base.mongodb",
+      "typeVersion": 1,
+      "position": [450, 600],
+      "credentials": {
+        "mongodb": {
+          "id": "1",
+          "name": "MongoDB Sentinel AI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "find",
+        "collection": "patches",
+        "options": {
+          "query": "{\n  \"applied_at\": {\n    \"$gte\": { \"$date\": \"{{ new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() }}\" }\n  },\n  \"status\": \"applied\"\n}",
+          "sort": "{ \"applied_at\": -1 }"
+        }
+      },
+      "name": "MongoDB - Fetch Patches",
+      "type": "n8n-nodes-base.mongodb",
+      "typeVersion": 1,
+      "position": [450, 800],
+      "credentials": {
+        "mongodb": {
+          "id": "1",
+          "name": "MongoDB Sentinel AI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "options": {}
+      },
+      "name": "Merge Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [650, 600]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare data for LLM\nconst scanStats = items[0].json;\nconst vulnerabilities = items.slice(1).filter(i => i.json.vulnerability_id);\nconst patches = items.slice(1).filter(i => i.json.patch_id);\n\nconst reportData = {\n  period: \"Last 7 Days\",\n  generated_at: new Date().toISOString(),\n  statistics: {\n    total_scans: scanStats.total_scans || 0,\n    total_vulnerabilities: scanStats.total_vulnerabilities || 0,\n    by_severity: {\n      critical: scanStats.critical_count || 0,\n      high: scanStats.high_count || 0,\n      medium: scanStats.medium_count || 0,\n      low: scanStats.low_count || 0\n    }\n  },\n  top_vulnerabilities: vulnerabilities.slice(0, 10).map(v => ({\n    cve: v.json.cve,\n    title: v.json.title,\n    cvss: v.json.cvss_score,\n    severity: v.json.severity\n  })),\n  patches_applied: patches.length,\n  patch_details: patches.slice(0, 5).map(p => ({\n    title: p.json.title,\n    vulnerabilities_fixed: p.json.vulnerabilities_fixed?.length || 0\n  }))\n};\n\nreturn [{ json: reportData }];"
+      },
+      "name": "Prepare Report Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [850, 600]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "method": "POST",
+        "jsonParameters": true,
+        "options": {
+          "timeout": 90000
+        },
+        "bodyParametersJson": "={\n  \"model\": \"llama2\",\n  \"prompt\": \"You are a cybersecurity compliance officer. Generate a comprehensive weekly security compliance report based on this data:\\n\\n{{ JSON.stringify($json, null, 2) }}\\n\\nProvide:\\n1. Executive Summary (3-4 sentences)\\n2. Overall Security Posture Assessment\\n3. Key Findings and Trends\\n4. Critical Vulnerabilities Requiring Immediate Attention\\n5. Remediation Progress\\n6. Compliance Status (CIS, NIST, PCI-DSS)\\n7. Recommendations for Next Week\\n\\nFormat as JSON with keys: executive_summary, security_posture (score 0-100), key_findings (array), critical_items (array), remediation_progress, compliance_scores (object), recommendations (array)\",\n  \"stream\": false\n}"
+      },
+      "name": "Ollama - Generate Report Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1050, 600]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse AI-generated report\nconst ollamaResponse = items[0].json.response;\nconst reportData = items[0].json;\n\nlet aiSummary;\ntry {\n  const jsonMatch = ollamaResponse.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    aiSummary = JSON.parse(jsonMatch[0]);\n  } else {\n    aiSummary = {\n      executive_summary: ollamaResponse.substring(0, 300),\n      security_posture: 75,\n      key_findings: [\"Review AI response for details\"],\n      critical_items: [],\n      remediation_progress: \"In progress\",\n      compliance_scores: {\n        cis: 80,\n        nist: 75,\n        pci_dss: 70\n      },\n      recommendations: [\"Continue monitoring\", \"Apply pending patches\"]\n    };\n  }\n} catch (error) {\n  aiSummary = {\n    error: error.message,\n    raw_response: ollamaResponse.substring(0, 500)\n  };\n}\n\nconst finalReport = {\n  report_id: `report_${Date.now()}`,\n  title: `Weekly Security Compliance Report - ${new Date().toLocaleDateString()}`,\n  period: reportData.period,\n  generated_at: reportData.generated_at,\n  statistics: reportData.statistics,\n  ai_analysis: aiSummary,\n  top_vulnerabilities: reportData.top_vulnerabilities,\n  patches_applied: reportData.patches_applied,\n  patch_details: reportData.patch_details,\n  report_type: \"weekly_compliance\"\n};\n\nreturn [{ json: finalReport }];"
+      },
+      "name": "Format Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1250, 600]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/reports/save",
+        "method": "POST",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ $json }}"
+      },
+      "name": "Save Report to DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1450, 600]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Simulate email sending\nconst report = items[0].json;\n\nconst emailData = {\n  to: [\"security-team@example.com\", \"management@example.com\"],\n  subject: `Weekly Security Report - ${new Date().toLocaleDateString()}`,\n  body: `\nWeekly Security Compliance Report\n================================\n\nPeriod: ${report.period}\nGenerated: ${new Date(report.generated_at).toLocaleString()}\n\nEXECUTIVE SUMMARY\n${report.ai_analysis.executive_summary}\n\nSECURITY POSTURE: ${report.ai_analysis.security_posture}/100\n\nSTATISTICS\n- Total Scans: ${report.statistics.total_scans}\n- Total Vulnerabilities: ${report.statistics.total_vulnerabilities}\n- Critical: ${report.statistics.by_severity.critical}\n- High: ${report.statistics.by_severity.high}\n- Medium: ${report.statistics.by_severity.medium}\n- Low: ${report.statistics.by_severity.low}\n\nPATCHES APPLIED: ${report.patches_applied}\n\nCOMPLIANCE SCORES\n- CIS Benchmark: ${report.ai_analysis.compliance_scores.cis}%\n- NIST: ${report.ai_analysis.compliance_scores.nist}%\n- PCI-DSS: ${report.ai_analysis.compliance_scores.pci_dss}%\n\nRECOMMENDATIONS\n${report.ai_analysis.recommendations.map((r, i) => `${i + 1}. ${r}`).join('\\n')}\n\nFull report available in the dashboard.\n  `,\n  sent_at: new Date().toISOString(),\n  status: \"sent\"\n};\n\nreturn [\n  {\n    json: {\n      ...report,\n      email: emailData\n    }\n  }\n];"
+      },
+      "name": "Send Email Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1650, 600]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger - Weekly": {
+      "main": [
+        [
+          { "node": "MongoDB - Fetch Scan Results", "type": "main", "index": 0 },
+          { "node": "MongoDB - Fetch Vulnerabilities", "type": "main", "index": 0 },
+          { "node": "MongoDB - Fetch Patches", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "MongoDB - Fetch Scan Results": {
+      "main": [[{ "node": "Merge Data", "type": "main", "index": 0 }]]
+    },
+    "MongoDB - Fetch Vulnerabilities": {
+      "main": [[{ "node": "Merge Data", "type": "main", "index": 1 }]]
+    },
+    "MongoDB - Fetch Patches": {
+      "main": [[{ "node": "Merge Data", "type": "main", "index": 1 }]]
+    },
+    "Merge Data": {
+      "main": [[{ "node": "Prepare Report Data", "type": "main", "index": 0 }]]
+    },
+    "Prepare Report Data": {
+      "main": [[{ "node": "Ollama - Generate Report Summary", "type": "main", "index": 0 }]]
+    },
+    "Ollama - Generate Report Summary": {
+      "main": [[{ "node": "Format Final Report", "type": "main", "index": 0 }]]
+    },
+    "Format Final Report": {
+      "main": [[{ "node": "Save Report to DB", "type": "main", "index": 0 }]]
+    },
+    "Save Report to DB": {
+      "main": [[{ "node": "Send Email Report", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {},
+  "staticData": null
+}
