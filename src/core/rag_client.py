@@ -582,8 +582,8 @@ if __name__ == "__main__":
     
     # Search for similar CVEs
     results = rag.search_similar_cves("SQL injection in authentication")
-    print(f"Found {len(results)} similar CVEs")
+    logger.info(f"Found {len(results)} similar CVEs")
     
     # Get stats
     stats = rag.get_collection_stats()
-    print(f"Collection stats: {stats}")
+    logger.info(f"Collection stats: {stats}")

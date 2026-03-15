@@ -30,11 +30,14 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS middleware
+# CORS middleware (Hardened for Production)
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001")
+origins = [origin.strip() for origin in allowed_origins_env.split(",")] if allowed_origins_env else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=origins,
+    allow_credentials=True,  # Now safe because wildcard origins are explicitly avoided if .env is set
     allow_methods=["*"],
     allow_headers=["*"],
 )

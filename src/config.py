@@ -40,6 +40,12 @@ class Config:
     LLM_URL = os.getenv("LLM_URL", "http://localhost:11434")
     
     # Security
-    SECRET_KEY = os.getenv("SECRET_KEY", "sentinel-ai-secret-key")
-    JWT_SECRET = os.getenv("JWT_SECRET", "sentinel-ai-jwt-secret")
-    ADMIN_JWT_SECRET = os.getenv("ADMIN_JWT_SECRET", "sentinel-ai-admin-jwt-secret")
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    JWT_SECRET = os.getenv("JWT_SECRET")
+    ADMIN_JWT_SECRET = os.getenv("ADMIN_JWT_SECRET")
+
+# Validate critical secrets
+if not Config.JWT_SECRET or not Config.ADMIN_JWT_SECRET:
+    raise ValueError("CRITICAL: JWT_SECRET or ADMIN_JWT_SECRET environment variables are missing! "
+                     "These must be set in production to prevent token forgery.")
+

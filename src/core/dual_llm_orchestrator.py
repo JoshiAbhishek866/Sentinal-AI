@@ -9,6 +9,9 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import requests
 from enum import Enum
+from src.utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 class ThreatLevel(Enum):
     NONE = 0
@@ -52,7 +55,7 @@ class DualLLMOrchestrator:
             response.raise_for_status()
             return response.json().get('response', '')
         except Exception as e:
-            print(f"Error generating response: {e}")
+            logger.error(f"Error generating response: {e}")
             return None
     
     async def offensive_scan(self, target: Dict) -> Dict:
@@ -92,7 +95,7 @@ Context: {target.get('context', 'No additional context')}
 Provide detailed vulnerability analysis.
 """
         
-        print(f"🔴 Offensive LLM: Scanning {target.get('type')}...")
+        logger.info(f"🔴 Offensive LLM: Scanning {target.get('type')}...")
         response = self._generate_response(
             self.offensive_model,
             prompt,
@@ -145,7 +148,7 @@ Threat Level: {vulnerability.get('threat_level', 'UNKNOWN')}
 Provide comprehensive defense measures and patches.
 """
         
-        print(f"🔵 Defensive LLM: Generating patches...")
+        logger.info("🔵 Defensive LLM: Generating patches...")
         response = self._generate_response(
             self.defensive_model,
             prompt,
@@ -174,9 +177,9 @@ Provide comprehensive defense measures and patches.
         Returns:
             Complete analysis with vulnerabilities and patches
         """
-        print("\n" + "="*60)
-        print("🔄 Starting Attack-Defense Cycle")
-        print("="*60)
+        logger.info("="*60)
+        logger.info("🔄 Starting Attack-Defense Cycle")
+        logger.info("="*60)
         
         # Step 1: Offensive scan
         vulnerabilities = await self.offensive_scan(target)
@@ -197,8 +200,8 @@ Provide comprehensive defense measures and patches.
         
         self.threat_history.append(cycle_result)
         
-        print("✅ Cycle completed")
-        print("="*60 + "\n")
+        logger.info("✅ Cycle completed")
+        logger.info("="*60)
         
         return cycle_result
     
@@ -221,7 +224,7 @@ Provide comprehensive defense measures and patches.
         attack_analysis = await self._analyze_traffic_offensive(network_traffic)
         
         if attack_analysis['threat_detected']:
-            print(f"🚨 THREAT DETECTED: {attack_analysis['threat_level']}")
+            logger.warning(f"🚨 THREAT DETECTED: {attack_analysis['threat_level']}")
             
             # Defensive LLM responds
             response = await self._respond_to_threat(attack_analysis)
@@ -389,23 +392,23 @@ Provide IMMEDIATE response actions. Format your response clearly.
         (Integrate with your actual infrastructure)
         """
         for action in actions:
-            print(f"🛡️  Executing: {action['type']} - {action['action']}")
+            logger.info(f"🛡️  Executing: {action['type']} - {action['action']}")
             
             if action['type'] == 'firewall':
                 # TODO: Integrate with firewall API
-                print(f"   → Blocking IP via firewall")
+                logger.info("   → Blocking IP via firewall")
             
             elif action['type'] == 'notification':
                 # TODO: Send alert to SOC
-                print(f"   → Sending alert to security team")
+                logger.info("   → Sending alert to security team")
             
             elif action['type'] == 'patch':
                 # TODO: Apply security patch
-                print(f"   → Applying security patch")
+                logger.info("   → Applying security patch")
             
             elif action['type'] == 'monitoring':
                 # TODO: Increase monitoring
-                print(f"   → Increasing monitoring level")
+                logger.info("   → Increasing monitoring level")
     
     def get_statistics(self) -> Dict:
         """
@@ -448,7 +451,7 @@ def login(username, password):
     }
     
     result = await orchestrator.attack_defense_cycle(target)
-    print(json.dumps(result, indent=2))
+    logger.info(f"Result: {json.dumps(result, indent=2)}")
 
 
 async def example_api_scan():
@@ -468,7 +471,7 @@ Returns: {"id": 123, "email": "user@example.com", "ssn": "123-45-6789"}
     }
     
     result = await orchestrator.attack_defense_cycle(target)
-    print(json.dumps(result, indent=2))
+    logger.info(f"Result: {json.dumps(result, indent=2)}")
 
 
 async def example_traffic_analysis():
@@ -489,25 +492,25 @@ async def example_traffic_analysis():
     }
     
     result = await orchestrator.real_time_threat_detection(traffic)
-    print(json.dumps(result, indent=2))
+    logger.info(f"Result: {json.dumps(result, indent=2)}")
 
 
 async def main():
     """
     Run all examples
     """
-    print("🚀 Sentinel AI Dual LLM Orchestrator Demo\n")
+    logger.info("🚀 Sentinel AI Dual LLM Orchestrator Demo")
     
     # Example 1: Code vulnerability scan
-    print("\n📝 Example 1: Scanning vulnerable code...")
+    logger.info("📝 Example 1: Scanning vulnerable code...")
     await example_code_scan()
     
     # Example 2: API security scan
-    print("\n🌐 Example 2: Scanning API endpoint...")
+    logger.info("🌐 Example 2: Scanning API endpoint...")
     await example_api_scan()
     
     # Example 3: Real-time threat detection
-    print("\n🚨 Example 3: Analyzing suspicious traffic...")
+    logger.info("🚨 Example 3: Analyzing suspicious traffic...")
     await example_traffic_analysis()
 
 
