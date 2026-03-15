@@ -1,0 +1,136 @@
+Project Specification – Vue.js + Node.js Website
+
+Frontend (Vue.js + Vite)
+The website will be designed with a luxurious, elegant, and modern look, using aesthetic shades of purple and green as the primary colors.
+
+Styling Guidelines
+- Semi-transparent UI components
+- Scoped styles to avoid CSS conflicts
+- Consistent typography with elegant Google Fonts
+- Reusable Button Component for uniform styling across the site
+- ESLint + Prettier for formatting
+- Vue 3 Composition API for scalability
+- defineAsyncComponent for lazy loading larger components
+
+Pages
+1. Loader Page
+2. Home Page
+3. About Page
+4. Book a Demo Page
+5. Blog Page
+6. Private Register/Login Page (restricted link)
+7. Dashboard (accessible only after login)
+
+Home Page Structure
+1. Header (with images and animations)
+   - Scroll behavior:
+     - Top: Large background image
+     - On scroll → transitions:
+       1. Full width
+       2. Shrinks (logo + site name visible)
+       3. Reduces to 40% width (only logo remains)
+   - Right-side content (60% width):
+     - Initially: Website name + Book Demo button + Light/Dark toggle
+     - Reduced: Only logo + Light/Dark toggle
+
+2. Light/Dark Mode
+   - Toggle in the header (top-right).
+   - Applied consistently across all components and pages.
+
+3. Hero Section
+   - 3D lock and key animation (Three.js).
+   - GSAP animation: Key appears → moves forward → unlocks the lock.
+
+4. Achievements Section
+   - Highlights milestones or statistics.
+
+5. Features and Benefits
+   - Each feature with its corresponding benefit.
+
+6. Examples Section (Images)
+   - Animated cards with hover or scroll-triggered effects.
+
+7. Schedule Demo Component
+   - Includes image + CTA.
+
+About Page
+- Overview of the company, mission, and values.
+- Rich layout with modern design components.
+
+Book a Demo Page
+- Description of the demo service.
+- Form with validations (VeeValidate / Vuelidate + Axios + Pinia).
+
+Blog Page
+- Blog/articles in elegant card layout.
+- Support for images, tags, and light/dark mode styling.
+
+Private Register/Login (Restricted Access)
+- Access: The register/login link is private and only shared with company users.
+- Features:
+  - JWT-based authentication (secure sessions).
+  - Form validation (VeeValidate / Vuelidate).
+  - Redirects to Dashboard after successful login.
+  - Role-based access control (e.g., admin vs. analyst).
+  - Brute-force protection with rate limiting.
+
+Dashboard (Company-Only Access)
+- Purpose: Provide insights and analytics related to attack/defense performance.
+- Sections:
+  1. Overview Panel – Real-time stats on attacks, defenses, uptime.
+  2. Attack Insights – Attempted intrusions, blocked threats, trends.
+  3. Defense Metrics – Success rate of mitigation, security scores.
+  4. System Health – Server status, uptime, monitoring alerts.
+  5. Activity Logs – Detailed history of events, exportable in CSV/JSON.
+  6. Settings – Profile management, notification preferences.
+
+- Frontend Features:
+  - Charts & graphs (Chart.js, D3.js, or Recharts for Vue).
+  - Dark/light mode consistency.
+  - Modular and responsive layout.
+
+Backend (Node.js + Express)
+Security & Features
+1. Validation: Email format, password strength, length restrictions.
+2. Email Notifications: SendGrid / Nodemailer for account events.
+3. Spam Protection: Rate limiting + CAPTCHA.
+4. Security Middleware: CORS, Helmet.js, input sanitization.
+5. Protected Routes:
+   - JWT authentication for private login.
+   - Role-based access for dashboard APIs.
+
+Tech Stack Summary
+- Frontend: Vue.js (Composition API, Vue Router, Pinia, Vite, Axios, VeeValidate/Vuelidate, GSAP, Three.js)
+- Backend: Node.js (Express.js, JWT Auth, Mail service, Security middlewares)
+- Styling: Scoped styles, luxury semi-transparent purple & green theme, modern Google Fonts
+- Dashboard Enhancements: Charts/graphs, role-based access, secure data handling
+- Best Practices: Component reusability, code-splitting, ESLint + Prettier
+
+------------------------------------------------------------
+
+Suggested Improvements & Best Practices
+
+Security
+- Enforce HTTPS everywhere
+- Add multi-factor authentication for admin/company logins
+- Apply Content Security Policy (CSP), anti-XSS headers
+- Automated vulnerability scanning during CI/CD
+- Regular code audits for dependency threats (npm audit, Snyk)
+- GDPR, ISO, and OWASP Top-10 compliance
+
+Usability & Design
+- Mobile-responsive, accessible WCAG 2.1
+- Trust badges and compliance marks in UI
+- Sticky navigation, prominent CTAs
+- Public demo dashboard (with mock data)
+- Downloadable case studies and whitepapers for lead generation
+
+Business & Value
+- Advanced analytics and reporting in admin dashboard
+- Flexible theming (for white-labeling or partners)
+- Scheduled database backups, multi-region server support
+- SEO-ready architecture, integration with blog/articles
+
+
+
+

@@ -11,13 +11,24 @@ dynamodb = boto3.resource('dynamodb', region_name=Config.AWS_REGION)
 waf_client = boto3.client('wafv2', region_name=Config.AWS_REGION)
 audit_table = dynamodb.Table(Config.DYNAMODB_TABLE_AUDIT)
 
+# Module-level session context — updated by campaign caller
+_session_context = {"session_id": "default", "actor_id": "default_user"}
+
+
+def set_session_context(session_id: str, actor_id: str):
+    """Set the session context for audit logging."""
+    _session_context["session_id"] = session_id
+    _session_context["actor_id"] = actor_id
+
+
 @tool
 def update_waf_acl(rule_name: str, attack_type: str, action: str = "BLOCK") -> dict:
     """Update AWS WAF ACL rules to block attack vectors"""
     audit_table.put_item(Item={
-        "session_id": "current_session",
+        "session_id": _session_context["session_id"],
         "event_timestamp": int(datetime.utcnow().timestamp()),
         "agent_type": "BLUE",
+        "actor_id": _session_context["actor_id"],
         "action": "waf_rule_update",
         "target": rule_name,
         "outcome": "success"
@@ -36,9 +47,10 @@ def update_waf_acl(rule_name: str, attack_type: str, action: str = "BLOCK") -> d
 def modify_security_group(group_id: str, rule_action: str, port: int) -> dict:
     """Modify security group rules to restrict access"""
     audit_table.put_item(Item={
-        "session_id": "current_session",
+        "session_id": _session_context["session_id"],
         "event_timestamp": int(datetime.utcnow().timestamp()),
         "agent_type": "BLUE",
+        "actor_id": _session_context["actor_id"],
         "action": "security_group_modification",
         "target": group_id,
         "outcome": "success"
@@ -56,7 +68,6 @@ def modify_security_group(group_id: str, rule_action: str, port: int) -> dict:
 @tool
 def query_knowledge_base(attack_vector: str) -> dict:
     """Query RAG knowledge base for mitigation strategies"""
-    # Simulated knowledge base query
     strategies = {
         "SQL Injection": {
             "mitigation": "Enable WAF SQL injection rule set, implement parameterized queries",
@@ -110,7 +121,6 @@ Conclusion: All security controls operating effectively.
     
     report_key = f"compliance-reports/soc2/campaign-{campaign_id}-{datetime.utcnow().strftime('%Y%m%d')}.txt"
     
-    # Simulated S3 upload
     return {
         "status": "generated",
         "report_path": f"s3://{Config.S3_BUCKET_REPORTS}/{report_key}",
@@ -132,8 +142,7 @@ class BlueAgent:
         
         self.tools = [update_waf_acl, modify_security_group, query_knowledge_base, generate_compliance_report]
         
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a Blue Team AI agent for Sentinel AI, an autonomous purple teaming platform.
+        self.base_system_prompt = """You are a Blue Team AI agent for Sentinel AI, an autonomous purple teaming platform.
 
 Your mission: Detect attacks from the Red Agent and automatically remediate vulnerabilities.
 
@@ -150,16 +159,43 @@ You have access to these defense tools:
 - query_knowledge_base: Retrieve mitigation strategies from RAG
 - generate_compliance_report: Create SOC 2 audit reports
 
-Analyze the detected threat and execute appropriate defenses."""),
+Analyze the detected threat and execute appropriate defenses."""
+    
+    def _build_prompt(self, memory_context: str = None) -> ChatPromptTemplate:
+        """Build prompt with optional memory context injected."""
+        system = self.base_system_prompt
+        if memory_context:
+            system += f"\n\n{memory_context}"
+        
+        return ChatPromptTemplate.from_messages([
+            ("system", system),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}")
         ])
-        
-        self.agent = create_tool_calling_agent(self.llm, self.tools, self.prompt)
-        self.executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
     
-    def respond_to_threat(self, threat_info: dict) -> dict:
-        """Respond to detected threat and auto-remediate"""
+    def respond_to_threat(self, threat_info: dict, memory_context: str = None,
+                          session_id: str = None, actor_id: str = None) -> dict:
+        """
+        Respond to detected threat and auto-remediate.
+        
+        Args:
+            threat_info: Threat details (attack_type, target, details)
+            memory_context: Optional prior context from CampaignMemoryManager
+            session_id: Campaign session ID for audit trail
+            actor_id: Who initiated this campaign
+        """
+        # Set session context for audit logging
+        if session_id or actor_id:
+            set_session_context(
+                session_id=session_id or "default",
+                actor_id=actor_id or "default_user"
+            )
+        
+        # Build prompt with memory-aware context
+        prompt = self._build_prompt(memory_context)
+        agent = create_tool_calling_agent(self.llm, self.tools, prompt)
+        executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True)
+        
         input_text = f"""
 THREAT DETECTED:
 Attack Type: {threat_info.get('attack_type', 'Unknown')}
@@ -173,5 +209,5 @@ Execute defensive response:
 
 Respond immediately!"""
         
-        result = self.executor.invoke({"input": input_text})
+        result = executor.invoke({"input": input_text})
         return result

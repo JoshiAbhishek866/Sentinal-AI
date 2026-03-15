@@ -4,134 +4,109 @@
 
 ```
 sentinel-ai/
-├── .kiro/                              # Kiro IDE configuration
-│   ├── specs/                          # Feature specifications
-│   │   └── sentinel-ai/
-│   │       ├── requirements.md         # Requirements specification
-│   │       ├── design.md              # Design document
-│   │       └── tasks.md               # Implementation tasks
-│   └── steering/                       # AI-DLC steering rules
-│       ├── aws-aidlc-rules/
-│       │   └── core-workflow.md       # Main workflow orchestration
-│       └── aws-aidlc-rule-details/
-│           ├── common/                 # Shared rules
-│           │   ├── depth-levels.md
-│           │   ├── question-format-guide.md
-│           │   ├── session-continuity.md
-│           │   └── scope-message.md
-│           ├── inception/              # Inception stage rules
-│           │   ├── workspace-detection.md
-│           │   ├── requirements-analysis.md
-│           │   ├── user-stories.md
-│           │   ├── application-design.md
-│           │   └── units-generation.md
-│           ├── construction/           # Construction stage rules
-│           │   ├── functional-design.md
-│           │   ├── nfr-requirements.md
-│           │   ├── nfr-design.md
-│           │   ├── code-generation.md
-│           │   └── build-and-test.md
-│           └── operations/             # Operations stage rules
-│               └── operations.md
-│
-├── src/                                # Source code
+├── src/                                # Source code (Python backend)
 │   ├── __init__.py
-│   ├── main.py                        # FastAPI application entry point
+│   ├── main.py                        # Unified FastAPI entry point
 │   ├── config.py                      # Configuration management
-│   └── agents/                        # AI agents
-│       ├── __init__.py
-│       ├── red_agent.py              # Offensive AI agent
-│       └── blue_agent.py             # Defensive AI agent
+│   ├── agents/                        # All AI agents
+│   │   ├── __init__.py               # Exports all agent types
+│   │   ├── red_agent.py              # Offensive AI (LangChain + Bedrock)
+│   │   ├── blue_agent.py             # Defensive AI (LangChain + Bedrock)
+│   │   ├── base_agent.py             # Base agent class for orchestrator agents
+│   │   ├── offensive/                # Offensive agent modules
+│   │   │   ├── recon_agent.py
+│   │   │   ├── scanner_agent.py
+│   │   │   ├── vuln_agent.py
+│   │   │   ├── credential_testing_agent.py
+│   │   │   └── report_generator_agent.py
+│   │   ├── defensive/                # Defensive agent modules
+│   │   │   ├── threat_detection_agent.py
+│   │   │   ├── hardening_agent.py
+│   │   │   ├── vuln_prioritization_agent.py
+│   │   │   ├── incident_response_agent.py
+│   │   │   └── compliance_check_agent.py
+│   │   └── core/                     # Core infrastructure agents
+│   │       ├── sandbox_manager_agent.py
+│   │       └── dashboard_reporter_agent.py
+│   ├── core/                          # Core infrastructure
+│   │   ├── orchestrator.py           # Multi-agent orchestrator
+│   │   ├── database.py               # MongoDB client
+│   │   ├── llm_client.py             # LLM integration (Ollama)
+│   │   ├── n8n_client.py             # n8n workflow integration
+│   │   ├── rag_client.py             # RAG vector database (ChromaDB)
+│   │   └── dual_llm_orchestrator.py  # Dual LLM Red/Blue coordination
+│   ├── routes/                        # Web platform API routes
+│   │   ├── admin_auth.py
+│   │   ├── client_auth.py
+│   │   ├── content.py
+│   │   ├── blog.py
+│   │   ├── demo_requests.py
+│   │   ├── clients.py
+│   │   ├── client_dashboard.py
+│   │   ├── uploads.py
+│   │   ├── password_reset.py
+│   │   ├── notifications.py
+│   │   ├── security.py
+│   │   ├── architecture.py
+│   │   └── seo.py
+│   ├── models/                        # Data models
+│   │   └── schemas.py
+│   └── utils/                         # Utilities
+│       ├── helpers.py
+│       ├── logger.py
+│       └── seed.py
+│
+├── frontend/                           # Vue.js client dashboard
+│   ├── src/
+│   │   ├── components/               # UI components
+│   │   ├── views/                    # Page views
+│   │   ├── stores/                   # State management
+│   │   ├── composables/              # Vue composables
+│   │   └── router/                   # Client-side routing
+│   └── package.json
+│
+├── admin/                              # Vue.js admin dashboard
+│   ├── src/
+│   │   ├── views/                    # Admin views
+│   │   ├── components/               # Admin components
+│   │   ├── stores/                   # State management
+│   │   └── router/                   # Admin routing
+│   └── package.json
+│
+├── n8n_workflows/                      # n8n workflow automation
+│   ├── 1_security_scan_orchestration.json
+│   ├── 2_ai_vulnerability_analysis.json
+│   ├── 3_automated_patch_recommendation.json
+│   ├── 4_incident_response_automation.json
+│   └── 5_compliance_report_generation.json
+│
+├── content/                            # Static content & documents
+│   ├── pdfs/
+│   ├── txt/
+│   └── xl/
 │
 ├── docs/                               # Documentation
-│   ├── ARCHITECTURE.md                # System architecture
-│   └── DEPLOYMENT.md                  # Deployment guide
+│   ├── ARCHITECTURE.md
+│   └── DEPLOYMENT.md
 │
-├── tests/                              # Test suite (to be created)
-│   ├── unit/
-│   ├── integration/
-│   └── e2e/
-│
-├── infrastructure/                     # IaC (to be created)
-│   └── cdk/                           # AWS CDK stacks
-│
-├── frontend/                           # Vue.js dashboard (to be created)
-│   └── src/
-│
-├── .env.example                        # Environment variables template
+├── .env.example                        # Environment configuration template
 ├── .gitignore                          # Git ignore rules
-├── Dockerfile                          # Container image definition
+├── Dockerfile                          # Container image
 ├── requirements.txt                    # Python dependencies
 ├── README.md                           # Project overview
+├── design.md                           # System design document
+├── requirements.md                     # Requirements specification
 └── PROJECT_STRUCTURE.md               # This file
 ```
-
-## Key Components
-
-### 1. Kiro Configuration (`.kiro/`)
-
-- **specs/**: Feature specifications following spec-driven development
-  - `requirements.md`: Functional and non-functional requirements (EARS notation)
-  - `design.md`: Detailed system design and architecture
-  - `tasks.md`: Implementation task breakdown
-
-- **steering/**: AI Development Lifecycle (AI-DLC) rules
-  - Organized by development stages: inception, construction, operations
-  - Provides guidance for AI-assisted development workflow
-
-### 2. Source Code (`src/`)
-
-- **main.py**: FastAPI server with campaign management endpoints
-- **config.py**: Centralized configuration using environment variables
-- **agents/**: LangChain-based AI agents
-  - `red_agent.py`: Offensive testing (SQL injection, XSS, privilege escalation)
-  - `blue_agent.py`: Defensive response (WAF updates, remediation, reporting)
-
-### 3. Documentation (`docs/`)
-
-- **ARCHITECTURE.md**: System architecture and component diagrams
-- **DEPLOYMENT.md**: Step-by-step deployment instructions
-
-### 4. Infrastructure (To Be Created)
-
-- AWS CDK stacks for infrastructure as code
-- DynamoDB tables, S3 buckets, IAM roles, etc.
-
-### 5. Frontend (To Be Created)
-
-- Vue.js 3 dashboard for campaign management
-- Real-time monitoring and compliance reporting
-
-## Development Workflow
-
-1. **Requirements** → Define in `.kiro/specs/sentinel-ai/requirements.md`
-2. **Design** → Document in `.kiro/specs/sentinel-ai/design.md`
-3. **Tasks** → Break down in `.kiro/specs/sentinel-ai/tasks.md`
-4. **Implementation** → Code in `src/`
-5. **Testing** → Tests in `tests/`
-6. **Deployment** → Follow `docs/DEPLOYMENT.md`
-
-## Getting Started
-
-1. Review `README.md` for project overview
-2. Read `.kiro/specs/sentinel-ai/requirements.md` for requirements
-3. Study `.kiro/specs/sentinel-ai/design.md` for architecture
-4. Follow `docs/DEPLOYMENT.md` for setup instructions
 
 ## Technology Stack
 
 - **Backend**: Python 3.11, FastAPI, LangChain
-- **AI**: Amazon Bedrock (Claude 3.5 Sonnet)
-- **Data**: DynamoDB, S3, Knowledge Bases for Amazon Bedrock
+- **AI**: Amazon Bedrock (Claude 3.5 Sonnet), Ollama
+- **RAG**: ChromaDB, Bedrock Knowledge Bases
+- **Data**: DynamoDB (campaigns), MongoDB (platform), S3
 - **Compute**: AWS App Runner (Docker)
-- **Frontend**: Vue.js 3, AWS Amplify
-- **IaC**: AWS CDK (Python)
+- **Frontend**: Vue.js 3, Three.js, Vite
+- **Admin**: Vue.js 3, CoreUI
+- **Workflows**: n8n (5 security automation workflows)
 - **Security**: AWS WAF, IAM, KMS
-
-## Next Steps
-
-1. Set up local development environment
-2. Configure AWS credentials
-3. Create DynamoDB tables and S3 buckets
-4. Deploy to AWS App Runner
-5. Build Vue.js frontend dashboard

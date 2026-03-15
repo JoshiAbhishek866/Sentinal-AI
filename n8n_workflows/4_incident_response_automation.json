@@ -1,0 +1,197 @@
+{
+  "name": "Sentinel AI - Incident Response Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "incident-response",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook - Incident Data",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 400]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "incident_title",
+              "value": "={{ $json.body.title }}"
+            },
+            {
+              "name": "severity",
+              "value": "={{ $json.body.severity }}"
+            },
+            {
+              "name": "description",
+              "value": "={{ $json.body.description }}"
+            },
+            {
+              "name": "source_ip",
+              "value": "={{ $json.body.source_ip || 'unknown' }}"
+            },
+            {
+              "name": "target_system",
+              "value": "={{ $json.body.target_system }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Parse Incident Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.severity }}",
+              "operation": "equals",
+              "value2": "critical"
+            }
+          ]
+        }
+      },
+      "name": "Check Severity - Critical",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.severity }}",
+              "operation": "equals",
+              "value2": "high"
+            }
+          ]
+        }
+      },
+      "name": "Check Severity - High",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 500]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "method": "POST",
+        "jsonParameters": true,
+        "options": {
+          "timeout": 60000
+        },
+        "bodyParametersJson": "={\n  \"model\": \"llama2\",\n  \"prompt\": \"You are a cybersecurity incident response expert. Analyze this security incident and provide:\\n\\nIncident: {{ $json.incident_title }}\\nSeverity: {{ $json.severity }}\\nDescription: {{ $json.description }}\\nSource IP: {{ $json.source_ip }}\\nTarget System: {{ $json.target_system }}\\n\\nProvide:\\n1. Incident summary (2-3 sentences)\\n2. Threat assessment\\n3. Immediate actions required\\n4. Investigation steps\\n5. Containment recommendations\\n6. Recovery steps\\n\\nFormat as JSON with keys: summary, threat_level, immediate_actions (array), investigation_steps (array), containment (array), recovery (array)\",\n  \"stream\": false\n}"
+      },
+      "name": "Ollama - Analyze Incident",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse AI analysis\nconst ollamaResponse = items[0].json.response;\n\nlet analysis;\ntry {\n  const jsonMatch = ollamaResponse.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    analysis = JSON.parse(jsonMatch[0]);\n  } else {\n    analysis = {\n      summary: ollamaResponse.substring(0, 200),\n      threat_level: items[0].json.severity,\n      immediate_actions: [\"Investigate incident\", \"Contain threat\"],\n      investigation_steps: [\"Review logs\", \"Analyze traffic\"],\n      containment: [\"Block source IP\", \"Isolate affected system\"],\n      recovery: [\"Restore from backup\", \"Verify integrity\"]\n    };\n  }\n} catch (error) {\n  analysis = {\n    error: error.message,\n    raw_response: ollamaResponse\n  };\n}\n\nreturn [\n  {\n    json: {\n      incident_id: `inc_${Date.now()}`,\n      title: items[0].json.incident_title,\n      severity: items[0].json.severity,\n      description: items[0].json.description,\n      source_ip: items[0].json.source_ip,\n      target_system: items[0].json.target_system,\n      ai_analysis: analysis,\n      detected_at: new Date().toISOString(),\n      status: \"investigating\"\n    }\n  }\n];"
+      },
+      "name": "Parse AI Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/incidents/create",
+        "method": "POST",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ $json }}"
+      },
+      "name": "Save Incident to DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Simulate JIRA ticket creation\nconst incident = items[0].json;\n\nconst ticketData = {\n  ticket_id: `JIRA-${Math.floor(Math.random() * 10000)}`,\n  ticket_url: `https://jira.example.com/browse/JIRA-${Math.floor(Math.random() * 10000)}`,\n  project: \"SECURITY\",\n  issue_type: \"Incident\",\n  priority: incident.severity === \"critical\" ? \"Highest\" : \"High\",\n  summary: incident.title,\n  description: incident.description,\n  labels: [\"security\", \"incident\", incident.severity],\n  created_at: new Date().toISOString()\n};\n\nreturn [\n  {\n    json: {\n      ...incident,\n      ticket: ticketData\n    }\n  }\n];"
+      },
+      "name": "Create JIRA Ticket (Simulated)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Simulate notification (Email/Slack)\nconst incident = items[0].json;\n\nconst notification = {\n  type: incident.severity === \"critical\" ? \"email_and_slack\" : \"slack\",\n  recipients: incident.severity === \"critical\" \n    ? [\"security-team@example.com\", \"ciso@example.com\"]\n    : [\"security-team@example.com\"],\n  subject: `[${incident.severity.toUpperCase()}] ${incident.title}`,\n  message: `Security Incident Detected\\n\\nSeverity: ${incident.severity}\\nIncident ID: ${incident.incident_id}\\nTicket: ${incident.ticket.ticket_url}\\n\\nSummary: ${incident.ai_analysis.summary}\\n\\nImmediate Actions Required:\\n${incident.ai_analysis.immediate_actions.map((a, i) => `${i + 1}. ${a}`).join('\\n')}`,\n  sent_at: new Date().toISOString(),\n  status: \"sent\"\n};\n\nreturn [\n  {\n    json: {\n      ...incident,\n      notification: notification\n    }\n  }\n];"
+      },
+      "name": "Send Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1650, 400]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/incidents/update",
+        "method": "PATCH",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"incident_id\": \"{{ $json.incident_id }}\",\n  \"ticket_id\": \"{{ $json.ticket.ticket_id }}\",\n  \"ticket_url\": \"{{ $json.ticket.ticket_url }}\",\n  \"notification_sent\": true\n}"
+      },
+      "name": "Update Incident Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1850, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"incident_id\": \"{{ $json.incident_id }}\",\n  \"ticket_id\": \"{{ $json.ticket.ticket_id }}\",\n  \"ticket_url\": \"{{ $json.ticket.ticket_url }}\",\n  \"message\": \"Incident response initiated\",\n  \"ai_analysis\": {{ $json.ai_analysis }}\n}",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2050, 400]
+    }
+  ],
+  "connections": {
+    "Webhook - Incident Data": {
+      "main": [[{ "node": "Parse Incident Data", "type": "main", "index": 0 }]]
+    },
+    "Parse Incident Data": {
+      "main": [
+        [
+          { "node": "Check Severity - Critical", "type": "main", "index": 0 },
+          { "node": "Check Severity - High", "type": "main", "index": 0 },
+          { "node": "Ollama - Analyze Incident", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Ollama - Analyze Incident": {
+      "main": [[{ "node": "Parse AI Analysis", "type": "main", "index": 0 }]]
+    },
+    "Parse AI Analysis": {
+      "main": [[{ "node": "Save Incident to DB", "type": "main", "index": 0 }]]
+    },
+    "Save Incident to DB": {
+      "main": [[{ "node": "Create JIRA Ticket (Simulated)", "type": "main", "index": 0 }]]
+    },
+    "Create JIRA Ticket (Simulated)": {
+      "main": [[{ "node": "Send Notification", "type": "main", "index": 0 }]]
+    },
+    "Send Notification": {
+      "main": [[{ "node": "Update Incident Record", "type": "main", "index": 0 }]]
+    },
+    "Update Incident Record": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {},
+  "staticData": null
+}
