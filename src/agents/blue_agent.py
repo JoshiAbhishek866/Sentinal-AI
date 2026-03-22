@@ -1,15 +1,27 @@
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_aws import ChatBedrock
-from langchain.prompts import ChatPromptTemplate
-from langchain.tools import tool
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import tool
 import boto3
 from datetime import datetime
 from src.config import Config
 
-# Initialize AWS clients
-dynamodb = boto3.resource('dynamodb', region_name=Config.AWS_REGION)
-waf_client = boto3.client('wafv2', region_name=Config.AWS_REGION)
-audit_table = dynamodb.Table(Config.DYNAMODB_TABLE_AUDIT)
+# Lazy initialization for AWS clients
+_audit_table = None
+_waf_client = None
+
+def get_audit_table():
+    global _audit_table
+    if _audit_table is None:
+        dynamodb = boto3.resource('dynamodb', region_name=Config.AWS_REGION)
+        _audit_table = dynamodb.Table(Config.DYNAMODB_TABLE_AUDIT)
+    return _audit_table
+
+def get_waf_client():
+    global _waf_client
+    if _waf_client is None:
+        _waf_client = boto3.client('wafv2', region_name=Config.AWS_REGION)
+    return _waf_client
 
 # Module-level session context — updated by campaign caller
 _session_context = {"session_id": "default", "actor_id": "default_user"}
@@ -24,7 +36,7 @@ def set_session_context(session_id: str, actor_id: str):
 @tool
 def update_waf_acl(rule_name: str, attack_type: str, action: str = "BLOCK") -> dict:
     """Update AWS WAF ACL rules to block attack vectors"""
-    audit_table.put_item(Item={
+    get_audit_table().put_item(Item={
         "session_id": _session_context["session_id"],
         "event_timestamp": int(datetime.utcnow().timestamp()),
         "agent_type": "BLUE",
@@ -46,7 +58,7 @@ def update_waf_acl(rule_name: str, attack_type: str, action: str = "BLOCK") -> d
 @tool
 def modify_security_group(group_id: str, rule_action: str, port: int) -> dict:
     """Modify security group rules to restrict access"""
-    audit_table.put_item(Item={
+    get_audit_table().put_item(Item={
         "session_id": _session_context["session_id"],
         "event_timestamp": int(datetime.utcnow().timestamp()),
         "agent_type": "BLUE",

@@ -1,0 +1,6 @@
+print("start security")
+from src.core.orchestrator import AgentOrchestrator; print("AgentOrchestrator ok")
+from src.core.database import Database; print("Database ok")
+from src.core.n8n_client import N8NClient; print("N8NClient ok")
+from src.core.llm_client import LLMClient; print("LLMClient ok")
+print("end security")

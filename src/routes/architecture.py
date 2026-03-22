@@ -16,9 +16,10 @@ load_dotenv()
 router = APIRouter(prefix="/api/architecture", tags=["architecture"])
 
 # MongoDB connection
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
+MONGODB_URI = os.getenv("MONGO_URL", "mongodb://localhost:27017/")
 client = MongoClient(MONGODB_URI)
-db = client["Sentinel AI"]
+db_name = os.getenv("MONGO_DB", "sentinel_ai")
+db = client[db_name]
 
 
 # Pydantic models

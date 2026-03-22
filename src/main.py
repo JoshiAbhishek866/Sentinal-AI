@@ -42,13 +42,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize LangChain agents (AWS Bedrock)
-red_agent = RedAgent()
-blue_agent = BlueAgent()
+# Initialize LangChain agents (AWS Bedrock) lazily inside startup
+red_agent = None
+blue_agent = None
 
-# Initialize DynamoDB
-dynamodb = boto3.resource('dynamodb', region_name=Config.AWS_REGION)
-campaigns_table = dynamodb.Table(Config.DYNAMODB_TABLE_CAMPAIGNS)
+# Lazy initialization for DynamoDB
+_campaigns_table = None
+def get_campaigns_table():
+    global _campaigns_table
+    if _campaigns_table is None:
+        dynamodb = boto3.resource('dynamodb', region_name=Config.AWS_REGION)
+        _campaigns_table = dynamodb.Table(Config.DYNAMODB_TABLE_CAMPAIGNS)
+    return _campaigns_table
 
 # Global instances for orchestrator subsystem
 orchestrator = None
@@ -83,6 +88,7 @@ async def startup_event():
     """Initialize all components on startup"""
     global orchestrator, database, n8n_client, llm_client
     global memory_manager, hook_provider, feedback_hook
+    global red_agent, blue_agent
     
     logger.info("🚀 Starting Sentinel AI Platform...")
     
@@ -93,7 +99,7 @@ async def startup_event():
         feedback_hook = AttackDefenseFeedbackHook(memory_manager=memory_manager)
         logger.info("✅ Campaign memory initialized (DynamoDB)")
     except Exception as e:
-        logger.warning(f"⚠️ Campaign memory not available: {e}")
+        logger.warning("⚠️ Campaign memory not available: %s", str(e))
         memory_manager = None
         feedback_hook = None
     
@@ -106,7 +112,7 @@ async def startup_event():
         await database.connect()
         logger.info("✅ MongoDB database connected")
     except Exception as e:
-        logger.warning(f"⚠️ MongoDB not available: {e} — orchestrator features disabled")
+        logger.warning("⚠️ MongoDB not available: %s — orchestrator features disabled", str(e))
         database = None
     
     # Initialize n8n client
@@ -117,7 +123,7 @@ async def startup_event():
         )
         logger.info("✅ n8n client initialized")
     except Exception as e:
-        logger.warning(f"⚠️ n8n not available: {e}")
+        logger.warning("⚠️ n8n not available: %s", str(e))
         n8n_client = None
     
     # Initialize LLM client
@@ -129,7 +135,7 @@ async def startup_event():
         )
         logger.info("✅ LLM client initialized")
     except Exception as e:
-        logger.warning(f"⚠️ LLM not available: {e}")
+        logger.warning("⚠️ LLM not available: %s", str(e))
         llm_client = None
     
     # Initialize lifecycle hooks (auto-persist, auto-enrich)
@@ -151,8 +157,17 @@ async def startup_event():
             await orchestrator.initialize()
             logger.info("✅ Agent orchestrator initialized with 12 agents")
         except Exception as e:
-            logger.warning(f"⚠️ Orchestrator initialization failed: {e}")
+            logger.warning("⚠️ Orchestrator initialization failed: %s", str(e))
             orchestrator = None
+            
+    # Initialize UI demonstration agents
+    try:
+        logger.info("Initializing LangChain Bedrock agents...")
+        red_agent = RedAgent()
+        blue_agent = BlueAgent()
+        logger.info("✅ Bedrock agents initialized")
+    except Exception as e:
+        logger.warning("⚠️ Failed to initialize Bedrock Agents (AWS credentials required): %s", str(e))
     
     # Import and seed database for web platform routes
     try:
@@ -163,7 +178,7 @@ async def startup_event():
         app.state.db = db_client[db_name]
         logger.info("✅ Web platform database connected")
     except Exception as e:
-        logger.warning(f"⚠️ Web platform database not available: {e}")
+        logger.warning("⚠️ Web platform database not available: %s", str(e))
     
     logger.info("🎉 Sentinel AI Platform is ready!")
 
