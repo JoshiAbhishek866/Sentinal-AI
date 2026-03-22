@@ -1,14 +1,20 @@
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_aws import ChatBedrock
-from langchain.prompts import ChatPromptTemplate
-from langchain.tools import tool
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import tool
 import boto3
 from datetime import datetime
 from src.config import Config
 
-# Initialize AWS clients
-dynamodb = boto3.resource('dynamodb', region_name=Config.AWS_REGION)
-audit_table = dynamodb.Table(Config.DYNAMODB_TABLE_AUDIT)
+# Lazy initialization for AWS clients
+_audit_table = None
+
+def get_audit_table():
+    global _audit_table
+    if _audit_table is None:
+        dynamodb = boto3.resource('dynamodb', region_name=Config.AWS_REGION)
+        _audit_table = dynamodb.Table(Config.DYNAMODB_TABLE_AUDIT)
+    return _audit_table
 
 # Module-level session context — updated by campaign caller
 _session_context = {"session_id": "default", "actor_id": "default_user"}
@@ -32,7 +38,7 @@ def execute_sql_injection(target_url: str, payload: str) -> dict:
         }
     
     # Log attack attempt
-    audit_table.put_item(Item={
+    get_audit_table().put_item(Item={
         "session_id": _session_context["session_id"],
         "event_timestamp": int(datetime.utcnow().timestamp()),
         "agent_type": "RED",
@@ -55,7 +61,7 @@ def execute_sql_injection(target_url: str, payload: str) -> dict:
 @tool
 def test_xss_vulnerability(target_url: str, payload: str) -> dict:
     """Test XSS vulnerability on target endpoint"""
-    audit_table.put_item(Item={
+    get_audit_table().put_item(Item={
         "session_id": _session_context["session_id"],
         "event_timestamp": int(datetime.utcnow().timestamp()),
         "agent_type": "RED",
@@ -78,7 +84,7 @@ def test_xss_vulnerability(target_url: str, payload: str) -> dict:
 @tool
 def test_privilege_escalation(iam_role: str) -> dict:
     """Test IAM privilege escalation vectors"""
-    audit_table.put_item(Item={
+    get_audit_table().put_item(Item={
         "session_id": _session_context["session_id"],
         "event_timestamp": int(datetime.utcnow().timestamp()),
         "agent_type": "RED",
