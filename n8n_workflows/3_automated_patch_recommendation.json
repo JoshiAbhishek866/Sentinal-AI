@@ -1,0 +1,133 @@
+{
+  "name": "Sentinel AI - Automated Patch Recommendation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "patch-recommendation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook - CVE Data",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "cve_id",
+              "value": "={{ $json.body.cve }}"
+            },
+            {
+              "name": "vulnerability_title",
+              "value": "={{ $json.body.title }}"
+            },
+            {
+              "name": "description",
+              "value": "={{ $json.body.description }}"
+            },
+            {
+              "name": "affected_component",
+              "value": "={{ $json.body.component }}"
+            },
+            {
+              "name": "cvss_score",
+              "value": "={{ $json.body.cvss }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Parse CVE Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "method": "POST",
+        "jsonParameters": true,
+        "options": {
+          "timeout": 60000
+        },
+        "bodyParametersJson": "={\n  \"model\": \"llama2\",\n  \"prompt\": \"You are a security patch expert. Generate detailed patch recommendations for this vulnerability:\\n\\nCVE: {{ $json.cve_id }}\\nTitle: {{ $json.vulnerability_title }}\\nDescription: {{ $json.description }}\\nAffected Component: {{ $json.affected_component }}\\nCVSS Score: {{ $json.cvss_score }}\\n\\nProvide:\\n1. Patch title and version\\n2. Detailed description of the fix\\n3. Step-by-step remediation actions\\n4. Pre-patch checklist items\\n5. Estimated time to apply\\n6. Whether restart is required\\n7. Verification steps\\n\\nFormat as JSON with keys: title, version, description, actions (array), checklist (array), estimated_time_minutes, requires_restart, verification_steps (array)\",\n  \"stream\": false\n}"
+      },
+      "name": "Ollama - Generate Patch Steps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse Ollama response and format patch recommendations\nconst ollamaResponse = items[0].json.response;\n\nlet patchData;\ntry {\n  // Try to extract JSON from response\n  const jsonMatch = ollamaResponse.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    patchData = JSON.parse(jsonMatch[0]);\n  } else {\n    // Fallback: create structured patch from text\n    patchData = {\n      title: `Security Patch for ${items[0].json.cve_id}`,\n      version: \"1.0.0\",\n      description: ollamaResponse.substring(0, 200),\n      actions: [\n        \"Review vulnerability details\",\n        \"Apply security updates\",\n        \"Test functionality\",\n        \"Verify fix\"\n      ],\n      checklist: [\n        \"Backup system\",\n        \"Notify stakeholders\",\n        \"Schedule maintenance window\"\n      ],\n      estimated_time_minutes: 30,\n      requires_restart: true,\n      verification_steps: [\n        \"Run security scan\",\n        \"Verify vulnerability is patched\"\n      ]\n    };\n  }\n} catch (error) {\n  patchData = {\n    title: `Patch for ${items[0].json.cve_id}`,\n    error: error.message,\n    raw_response: ollamaResponse\n  };\n}\n\nreturn [\n  {\n    json: {\n      patch_id: `patch_${Date.now()}`,\n      vulnerability_id: items[0].json.cve_id,\n      ...patchData,\n      status: \"pending\",\n      generated_at: new Date().toISOString(),\n      generated_by: \"ai\"\n    }\n  }\n];"
+      },
+      "name": "Format Patch Recommendations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/patches/create",
+        "method": "POST",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ $json }}"
+      },
+      "name": "Save Patch to DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/vulnerabilities/update",
+        "method": "PATCH",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"vulnerability_id\": \"{{ $json.vulnerability_id }}\",\n  \"patch_id\": \"{{ $json.patch_id }}\",\n  \"patch_status\": \"pending\"\n}"
+      },
+      "name": "Update Vulnerability Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"patch_id\": \"{{ $json.patch_id }}\",\n  \"message\": \"Patch recommendations generated\",\n  \"patch\": {{ $node[\"Format Patch Recommendations\"].json }}\n}",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - CVE Data": {
+      "main": [[{ "node": "Parse CVE Data", "type": "main", "index": 0 }]]
+    },
+    "Parse CVE Data": {
+      "main": [[{ "node": "Ollama - Generate Patch Steps", "type": "main", "index": 0 }]]
+    },
+    "Ollama - Generate Patch Steps": {
+      "main": [[{ "node": "Format Patch Recommendations", "type": "main", "index": 0 }]]
+    },
+    "Format Patch Recommendations": {
+      "main": [[{ "node": "Save Patch to DB", "type": "main", "index": 0 }]]
+    },
+    "Save Patch to DB": {
+      "main": [[{ "node": "Update Vulnerability Record", "type": "main", "index": 0 }]]
+    },
+    "Update Vulnerability Record": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {},
+  "staticData": null
+}
