@@ -1,106 +1,131 @@
-# Sentinel AI - Autonomous Purple Teaming Platform
+# Sentinel AI — Autonomous Purple Teaming Platform
 
-**Tagline:** "Attack to Defend. Autonomously."
+> *Attack to Defend. Autonomously.*
 
-## Overview
+Sentinel AI deploys dual AI agents (Red Team + Blue Team) powered by **AWS Bedrock (Claude)** to validate security vulnerabilities through controlled exploitation and auto-remediation.
 
-Sentinel AI deploys dual-model AI agents (Red Team + Blue Team) to validate vulnerabilities through active exploitation and auto-remediation on AWS serverless infrastructure.
+## How It Works
 
-## Architecture
+```
+Target URL ──▶ Red Agent (Attack) ──▶ Blue Agent (Defend) ──▶ Report
+                  │                        │
+                  ├─ SQL Injection          ├─ WAF Rule Updates
+                  ├─ XSS Testing           ├─ Security Group Fixes
+                  └─ Privilege Escalation   └─ Compliance Report
+```
 
-- **Red Agent**: Offensive AI that executes controlled attacks (SQL injection, XSS, privilege escalation)
-- **Blue Agent**: Defensive AI that detects and auto-remediates vulnerabilities
-- **Knowledge Base**: RAG-powered learning system that evolves with each attack-defense cycle
+1. **Red Agent** — Offensive AI that runs controlled attacks (SQL injection, XSS, privilege escalation) against your target
+2. **Blue Agent** — Defensive AI that detects Red's attacks and auto-remediates (WAF rules, security groups, compliance reports)
+3. **Campaign** — A full Red → Blue cycle, logged to DynamoDB with audit trail
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| API | FastAPI (Python) |
+| AI/LLM | AWS Bedrock (Claude 3.5 Sonnet) via LangChain |
+| Database | AWS DynamoDB |
+| Reports | AWS S3 |
+| Security | AWS WAF, IAM |
+| Container | Docker |
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.11+
-- AWS Account with Bedrock access
-- AWS credentials configured
+- AWS Account with **Bedrock access enabled** (Claude model)
+- AWS credentials configured (`aws configure` or env vars)
 
-### Installation
+### Setup
 
 ```bash
+# Clone
+git clone https://github.com/JoshiAbhishek866/Sentinal-AI.git
+cd Sentinal-AI
+
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment
+# Configure
 cp .env.example .env
-# Edit .env with your AWS credentials and configuration
+# Edit .env with your AWS credentials
 
-# Run locally
+# Run
 python main.py
+# or
+uvicorn src.main:app --host 0.0.0.0 --port 8000
 ```
 
-### Docker Deployment
+### Docker
 
 ```bash
-# Build image
 docker build -t sentinel-ai .
-
-# Run container
 docker run -p 8000:8000 --env-file .env sentinel-ai
 ```
 
-## API Endpoints
+## API
 
-### Start Campaign
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | Service info |
+| `GET` | `/health` | Health check |
+| `POST` | `/campaigns/start` | Start a purple team campaign |
+| `GET` | `/campaigns/{id}` | Get campaign results |
+
+### Start a Campaign
+
 ```bash
-POST /campaigns/start
-{
-  "target_url": "http://test-target.example.com",
-  "target_description": "Test web application",
-  "iam_role": "test-role"
-}
+curl -X POST http://localhost:8000/campaigns/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "target_url": "https://your-app.example.com",
+    "target_description": "Web application security test",
+    "iam_role": "your-iam-role"
+  }'
 ```
 
-### Get Campaign Status
-```bash
-GET /campaigns/{campaign_id}
+## AWS Setup
+
+### Required Resources
+
+| Resource | Purpose |
+|----------|---------|
+| **Amazon Bedrock** | Claude 3.5 Sonnet for agent reasoning |
+| **DynamoDB** | `CampaignSessions` + `AuditLogs` tables |
+| **S3** | `sentinel-ai-artifacts` bucket for compliance reports |
+| **IAM Roles** | Separate roles for Red and Blue agents |
+
+### Environment Variables
+
+```env
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
+KNOWLEDGE_BASE_ID=your_kb_id
+DYNAMODB_TABLE_CAMPAIGNS=CampaignSessions
+DYNAMODB_TABLE_AUDIT=AuditLogs
+S3_BUCKET_REPORTS=sentinel-ai-artifacts
 ```
 
-### Health Check
-```bash
-GET /health
+## Project Structure
+
 ```
-
-## AWS Deployment
-
-### App Runner Deployment
-
-1. Push Docker image to ECR
-2. Create App Runner service
-3. Configure environment variables
-4. Enable auto-scaling
-
-### Required AWS Resources
-
-- Amazon Bedrock (Claude 3.5 Sonnet)
-- Knowledge Bases for Amazon Bedrock
-- DynamoDB tables: CampaignSessions, AuditLogs
-- S3 bucket for compliance reports
-- AWS WAF for attack detection
-- IAM roles for Red/Blue agents
-
-## Cost Estimate
-
-- MVP: ~$18/month (single customer)
-- Production: ~$28/customer/month (5 customers)
+src/
+├── main.py              # FastAPI app + campaign endpoints
+├── config.py            # AWS configuration
+└── agents/
+    ├── red_agent.py     # Offensive agent (SQL injection, XSS, priv esc)
+    └── blue_agent.py    # Defensive agent (WAF, security groups, compliance)
+```
 
 ## Security
 
-- Red Agent: Read-only access, no production data
-- Blue Agent: Write access to security controls only
-- All actions logged to immutable audit trail
-- KMS encryption for data at rest
-
-## Compliance
-
-- SOC 2 Type II aligned
-- ISO 27001 aligned
-- Auto-generated compliance reports
+- Red Agent has **read-only** simulated access — never modifies production data
+- Blue Agent has **write access** to security controls only (WAF, security groups)
+- All actions logged to **immutable DynamoDB audit trail**
+- Safety checks reject production targets by default
 
 ## License
 
