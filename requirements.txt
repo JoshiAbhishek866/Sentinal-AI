@@ -66,3 +66,6 @@ python-multipart~=0.0.6
 pytest~=8.0.0
 pytest-asyncio~=0.23.0
 httpx~=0.25.2
+
+# Multi-step Agent Reasoning (optional)
+langgraph~=0.2.0
