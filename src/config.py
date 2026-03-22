@@ -44,6 +44,26 @@ class Config:
     JWT_SECRET = os.getenv("JWT_SECRET")
     ADMIN_JWT_SECRET = os.getenv("ADMIN_JWT_SECRET")
 
+    # ChromaDB (Knowledge Store / Data Flywheel)
+    CHROMADB_PATH = os.getenv("CHROMADB_PATH", "./data/chromadb")
+    CHROMADB_COLLECTION = os.getenv("CHROMADB_COLLECTION", "security_findings")
+
+    # OpenAI (Optional — Multi-LLM support)
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4")
+
+    # Azure OpenAI (Optional — Multi-LLM support)
+    AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
+    AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+
+    # Threat Intelligence
+    THREAT_INTEL_CACHE_TTL_HOURS = int(os.getenv("THREAT_INTEL_CACHE_TTL_HOURS", "24"))
+    NVD_API_KEY = os.getenv("NVD_API_KEY")  # Optional — higher rate limits
+
+    # Agent Enhancements
+    AGENT_MODE = os.getenv("AGENT_MODE", "default")  # 'default' or 'langgraph'
+    AGENT_KILL_SWITCH = os.getenv("AGENT_KILL_SWITCH", "false")
+
 # Validate critical secrets
 if not Config.JWT_SECRET or not Config.ADMIN_JWT_SECRET:
     raise ValueError("CRITICAL: JWT_SECRET or ADMIN_JWT_SECRET environment variables are missing! "
