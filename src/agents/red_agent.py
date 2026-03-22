@@ -16,38 +16,43 @@ def get_audit_table():
         _audit_table = dynamodb.Table(Config.DYNAMODB_TABLE_AUDIT)
     return _audit_table
 
-# Module-level session context — updated by campaign caller
-_session_context = {"session_id": "default", "actor_id": "default_user"}
 
-
-def set_session_context(session_id: str, actor_id: str):
-    """Set the session context for audit logging."""
-    _session_context["session_id"] = session_id
-    _session_context["actor_id"] = actor_id
+def _build_audit_item(agent_type: str, action: str, target: str,
+                      session_id: str = "default", actor_id: str = "default_user",
+                      outcome: str = "simulated", **extra) -> dict:
+    """Build an audit log item with explicit context (no globals)."""
+    item = {
+        "session_id": session_id,
+        "event_timestamp": int(datetime.utcnow().timestamp()),
+        "agent_type": agent_type,
+        "actor_id": actor_id,
+        "action": action,
+        "target": target,
+        "outcome": outcome,
+    }
+    item.update(extra)
+    return item
 
 
 @tool
-def execute_sql_injection(target_url: str, payload: str) -> dict:
+def execute_sql_injection(target_url: str, payload: str,
+                          session_id: str = "default", actor_id: str = "default_user") -> dict:
     """Execute SQL injection attack against target URL with safety checks"""
-    # Safety check: reject production targets
-    if "prod" in target_url.lower() or "production" in target_url.lower():
+    # Safety check: scope enforcement + kill switch
+    from src.utils.scope_enforcer import ScopeEnforcer
+    if ScopeEnforcer.is_kill_switch_active():
         return {
             "status": "rejected",
-            "reason": "Production target detected - attack blocked",
+            "reason": "Global kill switch is active — all offensive operations blocked",
             "timestamp": datetime.utcnow().isoformat()
         }
     
     # Log attack attempt
-    get_audit_table().put_item(Item={
-        "session_id": _session_context["session_id"],
-        "event_timestamp": int(datetime.utcnow().timestamp()),
-        "agent_type": "RED",
-        "actor_id": _session_context["actor_id"],
-        "action": "sql_injection_attempt",
-        "target": target_url,
-        "payload": payload,
-        "outcome": "simulated"
-    })
+    get_audit_table().put_item(Item=_build_audit_item(
+        agent_type="RED", action="sql_injection_attempt",
+        target=target_url, session_id=session_id, actor_id=actor_id,
+        payload=payload
+    ))
     
     return {
         "status": "executed",
@@ -59,18 +64,14 @@ def execute_sql_injection(target_url: str, payload: str) -> dict:
     }
 
 @tool
-def test_xss_vulnerability(target_url: str, payload: str) -> dict:
+def test_xss_vulnerability(target_url: str, payload: str,
+                           session_id: str = "default", actor_id: str = "default_user") -> dict:
     """Test XSS vulnerability on target endpoint"""
-    get_audit_table().put_item(Item={
-        "session_id": _session_context["session_id"],
-        "event_timestamp": int(datetime.utcnow().timestamp()),
-        "agent_type": "RED",
-        "actor_id": _session_context["actor_id"],
-        "action": "xss_test",
-        "target": target_url,
-        "payload": payload,
-        "outcome": "simulated"
-    })
+    get_audit_table().put_item(Item=_build_audit_item(
+        agent_type="RED", action="xss_test",
+        target=target_url, session_id=session_id, actor_id=actor_id,
+        payload=payload
+    ))
     
     return {
         "status": "executed",
@@ -82,17 +83,13 @@ def test_xss_vulnerability(target_url: str, payload: str) -> dict:
     }
 
 @tool
-def test_privilege_escalation(iam_role: str) -> dict:
+def test_privilege_escalation(iam_role: str,
+                              session_id: str = "default", actor_id: str = "default_user") -> dict:
     """Test IAM privilege escalation vectors"""
-    get_audit_table().put_item(Item={
-        "session_id": _session_context["session_id"],
-        "event_timestamp": int(datetime.utcnow().timestamp()),
-        "agent_type": "RED",
-        "actor_id": _session_context["actor_id"],
-        "action": "privilege_escalation_test",
-        "target": iam_role,
-        "outcome": "simulated"
-    })
+    get_audit_table().put_item(Item=_build_audit_item(
+        agent_type="RED", action="privilege_escalation_test",
+        target=iam_role, session_id=session_id, actor_id=actor_id
+    ))
     
     return {
         "status": "executed",
@@ -157,12 +154,9 @@ Analyze the target infrastructure and execute appropriate attacks."""
             session_id: Campaign session ID for audit trail
             actor_id: Who initiated this campaign
         """
-        # Set session context for audit logging
-        if session_id or actor_id:
-            set_session_context(
-                session_id=session_id or "default",
-                actor_id=actor_id or "default_user"
-            )
+        # Set session context for audit logging (no more globals)
+        _sid = session_id or "default"
+        _aid = actor_id or "default_user"
         
         # Build prompt with memory-aware context
         prompt = self._build_prompt(memory_context)
