@@ -98,9 +98,7 @@ async def register(request: Request):
             "role": "viewer",
             "company": company,
             "emailVerified": False
-        },
-        "verificationToken": verification_token,  # Remove in production - for testing
-        "verificationLink": f"/auth/verify-email?token={verification_token}"
+        }
     }
 
 @router.post("/login")

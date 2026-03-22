@@ -23,28 +23,32 @@ def get_waf_client():
         _waf_client = boto3.client('wafv2', region_name=Config.AWS_REGION)
     return _waf_client
 
-# Module-level session context — updated by campaign caller
-_session_context = {"session_id": "default", "actor_id": "default_user"}
 
-
-def set_session_context(session_id: str, actor_id: str):
-    """Set the session context for audit logging."""
-    _session_context["session_id"] = session_id
-    _session_context["actor_id"] = actor_id
+def _build_audit_item(agent_type: str, action: str, target: str,
+                      session_id: str = "default", actor_id: str = "default_user",
+                      outcome: str = "success", **extra) -> dict:
+    """Build an audit log item with explicit context (no globals)."""
+    item = {
+        "session_id": session_id,
+        "event_timestamp": int(datetime.utcnow().timestamp()),
+        "agent_type": agent_type,
+        "actor_id": actor_id,
+        "action": action,
+        "target": target,
+        "outcome": outcome,
+    }
+    item.update(extra)
+    return item
 
 
 @tool
-def update_waf_acl(rule_name: str, attack_type: str, action: str = "BLOCK") -> dict:
+def update_waf_acl(rule_name: str, attack_type: str, action: str = "BLOCK",
+                   session_id: str = "default", actor_id: str = "default_user") -> dict:
     """Update AWS WAF ACL rules to block attack vectors"""
-    get_audit_table().put_item(Item={
-        "session_id": _session_context["session_id"],
-        "event_timestamp": int(datetime.utcnow().timestamp()),
-        "agent_type": "BLUE",
-        "actor_id": _session_context["actor_id"],
-        "action": "waf_rule_update",
-        "target": rule_name,
-        "outcome": "success"
-    })
+    get_audit_table().put_item(Item=_build_audit_item(
+        agent_type="BLUE", action="waf_rule_update",
+        target=rule_name, session_id=session_id, actor_id=actor_id
+    ))
     
     return {
         "status": "updated",
@@ -56,17 +60,13 @@ def update_waf_acl(rule_name: str, attack_type: str, action: str = "BLOCK") -> d
     }
 
 @tool
-def modify_security_group(group_id: str, rule_action: str, port: int) -> dict:
+def modify_security_group(group_id: str, rule_action: str, port: int,
+                          session_id: str = "default", actor_id: str = "default_user") -> dict:
     """Modify security group rules to restrict access"""
-    get_audit_table().put_item(Item={
-        "session_id": _session_context["session_id"],
-        "event_timestamp": int(datetime.utcnow().timestamp()),
-        "agent_type": "BLUE",
-        "actor_id": _session_context["actor_id"],
-        "action": "security_group_modification",
-        "target": group_id,
-        "outcome": "success"
-    })
+    get_audit_table().put_item(Item=_build_audit_item(
+        agent_type="BLUE", action="security_group_modification",
+        target=group_id, session_id=session_id, actor_id=actor_id
+    ))
     
     return {
         "status": "modified",
@@ -79,29 +79,45 @@ def modify_security_group(group_id: str, rule_action: str, port: int) -> dict:
 
 @tool
 def query_knowledge_base(attack_vector: str) -> dict:
-    """Query RAG knowledge base for mitigation strategies"""
+    """Query knowledge base for mitigation strategies. Attempts ChromaDB RAG first, falls back to local strategies."""
+    # Attempt real RAG query if ChromaDB is available
+    try:
+        import chromadb
+        client = chromadb.HttpClient(host="localhost", port=8000)
+        collection = client.get_collection("security_mitigations")
+        results = collection.query(query_texts=[attack_vector], n_results=3)
+        if results and results.get("documents") and results["documents"][0]:
+            return {
+                "attack_vector": attack_vector,
+                "strategy": {
+                    "mitigation": results["documents"][0][0],
+                    "source": "rag_knowledge_base",
+                    "confidence": results["distances"][0][0] if results.get("distances") else None,
+                },
+                "timestamp": datetime.utcnow().isoformat()
+            }
+    except Exception:
+        pass  # Fall back to local strategies
+    
+    # Fallback: curated local strategies
     strategies = {
         "SQL Injection": {
-            "mitigation": "Enable WAF SQL injection rule set, implement parameterized queries",
-            "success_rate": 0.95,
-            "cve_references": ["CVE-2024-1234"]
+            "mitigation": "Enable WAF SQL injection rule set, implement parameterized queries, use ORM",
+            "source": "local_fallback",
         },
         "XSS": {
-            "mitigation": "Enable WAF XSS protection, implement Content Security Policy",
-            "success_rate": 0.92,
-            "cve_references": ["CVE-2024-5678"]
+            "mitigation": "Enable WAF XSS protection, implement Content Security Policy, sanitize inputs",
+            "source": "local_fallback",
         },
         "Privilege Escalation": {
-            "mitigation": "Apply least privilege IAM policies, enable IAM Access Analyzer",
-            "success_rate": 0.88,
-            "cve_references": ["CVE-2024-9012"]
+            "mitigation": "Apply least privilege IAM policies, enable IAM Access Analyzer, audit role bindings",
+            "source": "local_fallback",
         }
     }
     
     strategy = strategies.get(attack_vector, {
-        "mitigation": "Generic security hardening recommended",
-        "success_rate": 0.75,
-        "cve_references": []
+        "mitigation": "Generic security hardening recommended — consult NIST 800-53 controls",
+        "source": "local_fallback",
     })
     
     return {
@@ -112,31 +128,47 @@ def query_knowledge_base(attack_vector: str) -> dict:
 
 @tool
 def generate_compliance_report(campaign_id: str, findings: str) -> dict:
-    """Generate SOC 2 compliance report based on campaign results"""
-    s3_client = boto3.client('s3', region_name=Config.AWS_REGION)
+    """Generate compliance report based on actual campaign findings — dynamically evaluates controls."""
+    findings_lower = findings.lower()
     
-    report_content = f"""
-SOC 2 Type II Compliance Report
+    # Evaluate controls based on actual findings
+    controls = {
+        "CC6.1: Logical Access Controls": "FAIL" if any(w in findings_lower for w in ["privilege escalation", "unauthorized", "access control"]) else "PASS",
+        "CC6.6: Encryption": "FAIL" if any(w in findings_lower for w in ["unencrypted", "plaintext", "http://"]) else "PASS",
+        "CC7.2: System Monitoring": "FAIL" if any(w in findings_lower for w in ["undetected", "no logging", "blind spot"]) else "PASS",
+        "CC6.3: Input Validation": "FAIL" if any(w in findings_lower for w in ["sql injection", "xss", "injection"]) else "PASS",
+    }
+    
+    passed = sum(1 for v in controls.values() if v == "PASS")
+    total = len(controls)
+    overall = "PASS" if passed == total else "FAIL"
+    
+    controls_text = "\n".join(f"  - {name} — {status}" for name, status in controls.items())
+    
+    report_content = f"""SOC 2 Type II Compliance Assessment
 Campaign ID: {campaign_id}
 Generated: {datetime.utcnow().isoformat()}
 
 Findings:
 {findings}
 
-Controls Validated:
-- CC6.1: Logical Access Controls - PASSED
-- CC6.6: Encryption - PASSED
-- CC7.2: System Monitoring - PASSED
+Controls Evaluated ({passed}/{total} passed):
+{controls_text}
 
-Conclusion: All security controls operating effectively.
-"""
+Overall Result: {overall}
+Note: This is an automated assessment. A qualified auditor should review these findings."""
     
     report_key = f"compliance-reports/soc2/campaign-{campaign_id}-{datetime.utcnow().strftime('%Y%m%d')}.txt"
     
     return {
         "status": "generated",
+        "overall_result": overall,
+        "controls_passed": passed,
+        "controls_total": total,
+        "controls": controls,
         "report_path": f"s3://{Config.S3_BUCKET_REPORTS}/{report_key}",
         "campaign_id": campaign_id,
+        "disclaimer": "Automated assessment — requires human auditor review",
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -196,12 +228,9 @@ Analyze the detected threat and execute appropriate defenses."""
             session_id: Campaign session ID for audit trail
             actor_id: Who initiated this campaign
         """
-        # Set session context for audit logging
-        if session_id or actor_id:
-            set_session_context(
-                session_id=session_id or "default",
-                actor_id=actor_id or "default_user"
-            )
+        # Set session context (no more globals)
+        _sid = session_id or "default"
+        _aid = actor_id or "default_user"
         
         # Build prompt with memory-aware context
         prompt = self._build_prompt(memory_context)

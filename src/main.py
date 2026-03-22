@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.agents.red_agent import RedAgent
@@ -17,6 +17,7 @@ from src.core.llm_client import LLMClient
 from src.core.memory import CampaignMemoryManager
 from src.core.hooks import SecurityHookProvider, AttackDefenseFeedbackHook
 from src.utils.logger import setup_logger
+from src.utils.auth_middleware import require_auth, require_admin
 
 # Load environment variables
 load_dotenv()
@@ -37,9 +38,9 @@ origins = [origin.strip() for origin in allowed_origins_env.split(",")] if allow
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,  # Now safe because wildcard origins are explicitly avoided if .env is set
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 # Initialize LangChain agents (AWS Bedrock) lazily inside startup
@@ -169,16 +170,20 @@ async def startup_event():
     except Exception as e:
         logger.warning("⚠️ Failed to initialize Bedrock Agents (AWS credentials required): %s", str(e))
     
-    # Import and seed database for web platform routes
-    try:
-        from motor.motor_asyncio import AsyncIOMotorClient
-        mongo_url = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-        db_name = os.getenv("MONGO_DB", "sentinel_ai")
-        db_client = AsyncIOMotorClient(mongo_url)
-        app.state.db = db_client[db_name]
-        logger.info("✅ Web platform database connected")
-    except Exception as e:
-        logger.warning("⚠️ Web platform database not available: %s", str(e))
+    # Reuse existing database connection for web platform routes
+    if database and database.db is not None:
+        app.state.db = database.db
+        logger.info("✅ Web platform database connected (reusing orchestrator connection)")
+    else:
+        try:
+            from motor.motor_asyncio import AsyncIOMotorClient
+            mongo_url = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+            db_name = os.getenv("MONGO_DB", "sentinel_ai")
+            db_client = AsyncIOMotorClient(mongo_url)
+            app.state.db = db_client[db_name]
+            logger.info("✅ Web platform database connected (standalone)")
+        except Exception as e:
+            logger.warning("⚠️ Web platform database not available: %s", str(e))
     
     logger.info("🎉 Sentinel AI Platform is ready!")
 
@@ -223,7 +228,7 @@ async def health_check():
 # ==================== Campaign Endpoints (AWS Bedrock) ====================
 
 @app.post("/campaigns/start", response_model=CampaignResponse)
-async def start_campaign(request: CampaignRequest):
+async def start_campaign(request: CampaignRequest, user: dict = Depends(require_auth)):
     """
     Initiate a purple teaming validation campaign.
     
@@ -242,7 +247,7 @@ async def start_campaign(request: CampaignRequest):
     
     try:
         # Initialize campaign in DynamoDB
-        campaigns_table.put_item(Item={
+        get_campaigns_table().put_item(Item={
             "campaign_id": campaign_id,
             "timestamp": int(datetime.utcnow().timestamp()),
             "status": "ACTIVE",
@@ -312,7 +317,7 @@ async def start_campaign(request: CampaignRequest):
             )
         
         # ── Finalize campaign ──
-        campaigns_table.update_item(
+        get_campaigns_table().update_item(
             Key={"campaign_id": campaign_id, "timestamp": int(datetime.utcnow().timestamp())},
             UpdateExpression="SET #status = :status, red_agent_actions = :red, blue_agent_actions = :blue",
             ExpressionAttributeNames={"#status": "status"},
@@ -332,53 +337,57 @@ async def start_campaign(request: CampaignRequest):
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Campaign failed: {str(e)}")
+        logger.error(f"Campaign failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Campaign execution failed")
 
 @app.get("/campaigns/{campaign_id}")
-def get_campaign(campaign_id: str):
+async def get_campaign(campaign_id: str, user: dict = Depends(require_auth)):
     """Retrieve campaign details"""
     try:
-        response = campaigns_table.get_item(Key={"campaign_id": campaign_id})
+        response = get_campaigns_table().get_item(Key={"campaign_id": campaign_id})
         if "Item" not in response:
             raise HTTPException(status_code=404, detail="Campaign not found")
         return response["Item"]
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get campaign: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve campaign")
 
 
 # ==================== Orchestrator Endpoints ====================
 
 @app.post("/agents/execute/{agent_type}")
-async def execute_agent(agent_type: str, target: dict):
+async def execute_agent(agent_type: str, target: dict, user: dict = Depends(require_auth)):
     """Execute a specific agent from the multi-agent system"""
     if not orchestrator:
-        return {"error": "Orchestrator not initialized — check MongoDB, n8n, and LLM connections"}
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized")
     
     result = await orchestrator.execute_agent(agent_type, target)
     return result
 
 @app.get("/agents/status")
-async def get_agents_status():
+async def get_agents_status(user: dict = Depends(require_auth)):
     """Get status of all agents"""
     if not orchestrator:
-        return {"error": "Orchestrator not initialized"}
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized")
     
     return orchestrator.get_agent_status()
 
 @app.get("/results/{result_id}")
-async def get_result(result_id: str):
+async def get_result(result_id: str, user: dict = Depends(require_auth)):
     """Get agent execution result"""
     if not database:
-        return {"error": "Database not initialized"}
+        raise HTTPException(status_code=503, detail="Database not initialized")
     
     result = await database.get_result(result_id)
     return result
 
 @app.get("/workflows")
-async def list_workflows():
+async def list_workflows(user: dict = Depends(require_auth)):
     """List all n8n workflows"""
     if not n8n_client:
-        return {"error": "n8n client not initialized"}
+        raise HTTPException(status_code=503, detail="n8n client not initialized")
     
     workflows = await n8n_client.list_workflows()
     return workflows
