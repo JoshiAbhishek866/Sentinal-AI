@@ -1,0 +1,9 @@
+Agent Type,Primary Function,AI Techniques
+Threat Detection Agent,"Real-time threat identification, IOC correlation","Ensemble learning, time series analysis"
+Incident Response Agent,"Automated containment, forensics, recovery","Decision trees, workflow automation"
+Patch Management Agent,"Vulnerability prioritization, automated patching","Risk scoring, dependency analysis"
+Access Control Monitor,"Identity verification, anomalous access detection","Behavioral analytics, clustering"
+Data Loss Prevention Agent,"Sensitive data classification, exfiltration prevention","NLP for content analysis, classification"
+Malware Analysis Agent,"Static/dynamic analysis, signature generation","Deep learning, sandboxing automation"
+Network Traffic Analyzer,"Protocol analysis, behavioral modeling","Unsupervised learning, anomaly detection"
+Security Orchestrator,"Cross-agent coordination, response automation","Multi-agent systems, game theory"

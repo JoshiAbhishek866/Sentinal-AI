@@ -8,7 +8,8 @@ import secrets
 
 router = APIRouter()
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "Sentinel AI-super-secret-jwt-key-2025")
+from src.config import Config
+JWT_SECRET = Config.JWT_SECRET
 
 def create_token(user_id: str):
     payload = {
@@ -97,9 +98,7 @@ async def register(request: Request):
             "role": "viewer",
             "company": company,
             "emailVerified": False
-        },
-        "verificationToken": verification_token,  # Remove in production - for testing
-        "verificationLink": f"/auth/verify-email?token={verification_token}"
+        }
     }
 
 @router.post("/login")

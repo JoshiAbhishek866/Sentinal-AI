@@ -1,0 +1,13 @@
+Quarter,Development Focus,Technical Milestones,Security Domains,Agent Development,Customer Metrics
+2026 Q1,Infrastructure Setup,"Kubernetes deployment, Basic agents",Web Security Foundation,"2 basic agents (web vuln, threat detection)",2-3 pilot customers
+2026 Q2,MVP Development,"Web security MVP, Offensive-defensive sync",Web Security Complete,"4 agents (+ API tester, incident response)",5-10 beta customers
+2026 Q3,Core Integration,"API security agents, Shared knowledge base",API Security Foundation,"6 agents (+ cloud auditor, patch mgmt)",15-25 paying customers
+2026 Q4,Market Launch,"Customer deployments, Performance optimization",API Security Complete,"8 agents (+ network pen, access control)",35-50 customers
+2027 Q1,Product Enhancement,"Cloud security module, Advanced learning",Cloud Security Foundation,"10 agents (+ IoT scanner, DLP)",75-100 customers
+2027 Q2,Customer Scaling,"IoT security agents, Enterprise integrations",Cloud Security Complete,"12 agents (+ social eng, malware analysis)",150-200 customers
+2027 Q3,Feature Expansion,"Automobile security, Predictive analytics",IoT Security Foundation,"14 agents (+ zero-day, traffic analyzer)",250-350 customers
+2027 Q4,Enterprise Features,"Compliance automation, Zero-day detection",IoT Security Complete,"16 agents (+ compliance, orchestrator)",400-500 customers
+2028 Q1,Advanced AI,"Advanced orchestration, ML optimization",Auto Security Foundation,Advanced learning integration,600-800 customers
+2028 Q2,Global Scaling,"Global infrastructure, Enterprise APIs",Auto Security Complete,Cross-domain coordination,1000+ customers
+2028 Q3,Market Leadership,"Next-gen AI agents, Autonomous operations",Advanced Analytics,Autonomous decision making,1500+ customers
+2028 Q4,Next-Gen Platform,"Platform evolution, Innovation pipeline",Next-Gen Capabilities,Next-generation AI agents,2000+ customers

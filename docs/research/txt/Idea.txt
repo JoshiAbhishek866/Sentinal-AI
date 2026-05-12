@@ -1,0 +1,23 @@
+The problem statement:-
+
+
+
+Solution:-
+Sentinel AI
+1. A cyber security agentic ai based company which has basically
+two models. 
+
+2. The first one is called "Offensive model" and the 
+second one is called "Defensive model". 
+
+3. Both the models has multiple ai agents for multiple purpose and 
+both the models are also integrated together for working efficently.
+
+4. The offensive model attacks a company's particular asset and finds 
+any vulnerabilities in it and at the same time the defensive model defends the same company's 
+asset to protect it.
+
+5. It will be a SaaS or a MicroSaaS structure with b2b model.
+
+6. Under both models, it will provide web security, app security, network security, cloud security, api security, IOT security and automobile security phase by phase.
+7. Also the vision of our company is to secure india from cyber attacks and data breaches.

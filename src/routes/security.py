@@ -8,16 +8,24 @@ from pydantic import BaseModel
 from typing import Optional, Dict, List
 import asyncio
 import os
+import uuid
 
 from src.core.orchestrator import AgentOrchestrator
 from src.core.database import Database
 from src.core.n8n_client import N8NClient
 from src.core.llm_client import LLMClient
+from src.utils.auth_middleware import require_auth
+from src.utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 router = APIRouter()
 
 # Global orchestrator instance
 orchestrator = None
+
+# Track running scans so results are retrievable
+_active_scans: Dict[str, Dict] = {}
 
 
 class ScanRequest(BaseModel):
@@ -65,7 +73,7 @@ async def get_orchestrator():
 
 
 @router.post("/scan", response_model=ScanResponse)
-async def start_scan(request: ScanRequest):
+async def start_scan(request: ScanRequest, user: dict = Depends(require_auth)):
     """
     Start a security scan
     
@@ -80,18 +88,33 @@ async def start_scan(request: ScanRequest):
     """
     try:
         orch = await get_orchestrator()
+        scan_id = str(uuid.uuid4())
         
-        # Start scan in background
-        task = asyncio.create_task(
-            orch.execute_workflow(
-                workflow_name=request.workflow,
-                target=request.target,
-                options=request.options
-            )
-        )
+        # Track scan state
+        _active_scans[scan_id] = {
+            "status": "running",
+            "workflow": request.workflow,
+            "target": request.target,
+            "result": None,
+            "error": None,
+        }
         
-        # Generate scan ID
-        scan_id = f"scan_{request.workflow}_{request.target}_{asyncio.current_task().get_name()}"
+        async def _run_scan():
+            try:
+                result = await orch.execute_workflow(
+                    workflow_name=request.workflow,
+                    target=request.target,
+                    options=request.options
+                )
+                _active_scans[scan_id]["status"] = "completed"
+                _active_scans[scan_id]["result"] = result
+            except Exception as exc:
+                logger.error(f"Scan {scan_id} failed: {exc}")
+                _active_scans[scan_id]["status"] = "failed"
+                _active_scans[scan_id]["error"] = str(exc)
+        
+        # Start scan in background (tracked)
+        asyncio.create_task(_run_scan())
         
         return ScanResponse(
             scan_id=scan_id,
@@ -100,7 +123,16 @@ async def start_scan(request: ScanRequest):
         )
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to start scan: {e}")
+        raise HTTPException(status_code=500, detail="Failed to start scan")
+
+
+@router.get("/scan/{scan_id}/status")
+async def get_scan_status(scan_id: str, user: dict = Depends(require_auth)):
+    """Get the status and result of a running/completed scan"""
+    if scan_id not in _active_scans:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return _active_scans[scan_id]
 
 
 @router.get("/workflows")
@@ -162,29 +194,32 @@ async def get_workflows():
 
 
 @router.get("/agents/status")
-async def get_agent_status():
+async def get_agent_status(user: dict = Depends(require_auth)):
     """Get status of all agents"""
     try:
         orch = await get_orchestrator()
         return orch.get_agent_status()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get agent status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get agent status")
 
 
 @router.get("/statistics")
-async def get_statistics():
+async def get_statistics(user: dict = Depends(require_auth)):
     """Get orchestrator statistics"""
     try:
         orch = await get_orchestrator()
         return await orch.get_statistics()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get statistics: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get statistics")
 
 
 @router.get("/history")
 async def get_scan_history(
     agent_type: Optional[str] = None,
-    limit: int = 50
+    limit: int = 50,
+    user: dict = Depends(require_auth)
 ):
     """Get scan execution history"""
     try:
@@ -192,11 +227,12 @@ async def get_scan_history(
         history = await orch.get_execution_history(agent_type, limit)
         return history
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get scan history: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get scan history")
 
 
 @router.get("/results/{result_id}")
-async def get_scan_result(result_id: str):
+async def get_scan_result(result_id: str, user: dict = Depends(require_auth)):
     """Get specific scan result by ID"""
     try:
         orch = await get_orchestrator()
@@ -207,15 +243,17 @@ async def get_scan_result(result_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get scan result: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get scan result")
 
 
 @router.get("/results/target/{target}")
-async def get_results_by_target(target: str):
+async def get_results_by_target(target: str, user: dict = Depends(require_auth)):
     """Get all results for a specific target"""
     try:
         orch = await get_orchestrator()
         results = await orch.db.get_results_by_target(target)
         return results
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get results by target: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get results")

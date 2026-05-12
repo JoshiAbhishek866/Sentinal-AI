@@ -1,0 +1,9 @@
+Agent Type,Primary Function,AI Techniques
+Web Vulnerability Scanner,"OWASP Top 10, SQL injection, XSS detection","NLP for payload generation, ML for pattern recognition"
+API Security Tester,"API endpoint discovery, authentication bypass","Graph neural networks, sequence analysis"
+Cloud Config Auditor,"Misconfiguration detection, privilege escalation","Rule-based systems, configuration analysis"
+Network Penetration Agent,"Port scanning, service enumeration, exploitation","Reinforcement learning, network topology analysis"
+IoT Device Scanner,"Firmware analysis, protocol fuzzing","Binary analysis, protocol reverse engineering"
+Social Engineering Simulator,"Phishing simulation, credential testing","Psychological modeling, content generation"
+Zero-Day Hunter,"Behavioral anomaly detection, exploit generation","Anomaly detection, adversarial ML"
+Compliance Validator,"Policy validation, audit trail analysis","Natural language processing, rule validation"

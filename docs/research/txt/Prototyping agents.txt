@@ -1,0 +1,22 @@
+Offensive agents:-
+1. Passive Recon Agent - Basic OSINT/WHOIS
+2. Port Scanner Agent - Nmap wrapper
+3. Web Vulnerability Scanner Agent - Nuclei/OWASP ZAP
+4. Credential Testing Agent - Basic brute force simulation
+5. Report Generator Agent - AI-powered findings summary
+
+Defensive agents:-
+1. Threat Detection Agent - Log analysis & alerts
+2. System Hardening Agent - Basic CIS checks
+3. Vulnerability Prioritization Agent - AI risk assessment
+4. Incident Response Agent - Automated ticket creation
+5. Compliance Check Agent - Basic security posture assessment
+
+Important agents:-
+1. Orchestrator Agent - Coordinates offensive/defensive
+2. Sandbox Manager Agent - Environment setup/teardown
+3. Dashboard Reporter Agent - Results visualization
+
+
+
+

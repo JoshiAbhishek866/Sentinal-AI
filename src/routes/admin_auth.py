@@ -7,13 +7,14 @@ import os
 
 router = APIRouter()
 
-JWT_SECRET = os.environ.get("ADMIN_JWT_SECRET", "Sentinel AI-admin-super-secret-jwt-key-2025")
+from src.config import Config
+JWT_SECRET = Config.ADMIN_JWT_SECRET
 
 def create_token(user_id: str, email: str):
     payload = {
         "user_id": user_id,
         "email": email,
-        # "exp": datetime.utcnow() + timedelta(days=7)
+        "exp": datetime.utcnow() + timedelta(hours=8)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
@@ -65,10 +66,12 @@ async def admin_login(request: Request):
                 "role": user.get("role", "admin")
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Server Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/me")
 async def get_current_user(request: Request):

@@ -1,0 +1,8 @@
+Layer,Components,Technologies
+Presentation Layer,"Web Dashboard, Mobile Apps, CLI Tools","React, Flutter, Python CLI"
+API Gateway,"Authentication, Rate Limiting, Load Balancing","Kong/Ambassador, OAuth 2.0, NGINX"
+Orchestration Layer,"Agent Coordinator, Workflow Engine, Scheduler","Apache Airflow, Celery, Redis Queue"
+AI Agent Layer,"Offensive Agents, Defensive Agents, Learning Engine","PyTorch, TensorFlow, LangChain, AutoGen"
+Integration Layer,"SIEM/SOAR Connectors, Threat Intel APIs","REST APIs, GraphQL, WebSockets"
+Data Layer,"Vector DB, Graph DB, Time Series DB, Cache","PostgreSQL, Neo4j, InfluxDB, Redis"
+Infrastructure Layer,"Kubernetes, Docker, Cloud Services","AWS/Azure, Terraform, Prometheus"

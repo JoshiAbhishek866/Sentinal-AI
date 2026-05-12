@@ -7,7 +7,8 @@ from bson import ObjectId
 
 router = APIRouter()
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "Sentinel AI-super-secret-jwt-key-2025")
+from src.config import Config
+JWT_SECRET = Config.JWT_SECRET
 
 def verify_token(token: str):
     try:

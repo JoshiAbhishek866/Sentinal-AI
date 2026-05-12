@@ -1,0 +1,6 @@
+Phase,Monthly Infrastructure Cost,Annual Infrastructure Cost,Cloud Resources,Data Storage,Agent Capacity
+Pre-Seed,$25K-40K,$300K-480K,"Basic K8s cluster, 10-20 GPU hours",1-5 TB,100-500 concurrent
+Seed,$50K-80K,$600K-960K,"Multi-region deployment, 100-200 GPU hours",10-50 TB,1K-5K concurrent
+Series A,$100K-150K,$1.2M-1.8M,"Global infrastructure, 500-1000 GPU hours",100-500 TB,10K-50K concurrent
+Series B,$200K-350K,$2.4M-4.2M,"Enterprise-grade, 2000+ GPU hours",1-5 PB,100K+ concurrent
+Growth,$500K+,$6M+,"Massive scale, 10000+ GPU hours",10+ PB,1M+ concurrent

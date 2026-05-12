@@ -1,0 +1,55 @@
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment files
+.env
+.env.local
+
+# Dependencies
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs and debug
+logs/
+*.log
+debug_*
+uvicorn.log
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Frontend build (built separately)
+frontend/
+admin/
+
+# Documentation (not needed in container)
+docs/
+*.md
+!README.md
+
+# Test and dev files
+tests/
+pytest.ini
+.kiro/
